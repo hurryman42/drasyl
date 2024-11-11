@@ -24,7 +24,7 @@ public class X509_validation {
     public static void main(String[] args) throws Exception {
         try {
             // get X509Certificate instance out of .crt-file
-            FileInputStream inputStream = new FileInputStream("x509Certificate.crt");
+            FileInputStream inputStream = new FileInputStream("X509Certificate.crt");
             CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
             X509Certificate certificate = (X509Certificate) certificateFactory.generateCertificate(inputStream);
 
