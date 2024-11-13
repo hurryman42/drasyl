@@ -15,37 +15,38 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.PKIXParameters;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public class X509_validation {
+public class ValidateX509Certificate {
     public static void main(String[] args) throws Exception {
         try {
-            // get X509Certificate instance out of .crt-file
-            FileInputStream inputStream = new FileInputStream("X509Certificate.crt");
+            // get X509Certificate instance out of .pem-file
+            FileInputStream inputStream = new FileInputStream("certificate.pem");
             CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
             X509Certificate certificate = (X509Certificate) certificateFactory.generateCertificate(inputStream);
-
-            // load the trust store (e.g., the trusted CA certificates)
-            FileInputStream trustStream = new FileInputStream("TrustStore.jks");
-            KeyStore trustStore = KeyStore.getInstance("JKS");
-            trustStore.load(trustStream, "truststorePassword".toCharArray());
+            //System.out.println(certificate); // DEBUG
 
             // check if certificate is expired
-            certificate.checkValidity();
+            certificate.checkValidity(new Date());
+
+            // load the trust store (e.g., the trusted CA certificates)
+            KeyStore trustStore = KeyStore.getInstance("JKS");
+            trustStore.load(new FileInputStream("TrustStore.jks"), "truststorePassword".toCharArray());
 
             // create a certificate chain including only the certificate to be verified
             CertPath certPath = certificateFactory.generateCertPath(List.of(certificate));
 
             // extract trust anchors from the trust store
             Set<TrustAnchor> trustAnchors = new HashSet<>();
-            //Enumeration<String> aliases = trustStore.aliases();
             for (Enumeration<String> aliases = trustStore.aliases(); aliases.hasMoreElements();) {
-                Certificate cert = trustStore.getCertificate(aliases.nextElement());
-                if (cert instanceof X509Certificate) {
-                    trustAnchors.add(new TrustAnchor((X509Certificate) cert, null));
+                Certificate trustedCert = trustStore.getCertificate(aliases.nextElement());
+                certificate.verify(trustedCert.getPublicKey());
+                if (trustedCert instanceof X509Certificate) {
+                    trustAnchors.add(new TrustAnchor((X509Certificate) trustedCert, null));
                 }
             }
 
@@ -58,9 +59,6 @@ public class X509_validation {
             certPathValidator.validate(certPath, PKIXParams);
 
             System.out.println("Certificate is valid.");
-
-            // extract the .pem-file (public key) from the certificate & compare it with the certificate
-
         }
         catch (CertPathValidatorException e) {
             System.out.println("Certificate path could not be validated: " + e.getMessage());
