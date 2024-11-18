@@ -18,42 +18,44 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Security;
-import java.security.Signature;
-import java.security.SignatureException;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.security.spec.InvalidKeySpecException;
 import java.util.Base64;
 import java.util.Date;
 
 public class VerifyX509CSR {
-    public static void main(String[] args) throws IOException, SignatureException, CertificateException, OperatorCreationException {
+    public static void main(String[] args) throws IOException, CertificateException, OperatorCreationException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchProviderException {
         Security.addProvider(new BouncyCastleProvider());
 
-        // load CA's private key
-        String caPrivateKeyFilePath = "ca_ed25519_private.key";
-        PEMParser pemParser0 = new PEMParser(new FileReader(caPrivateKeyFilePath));
-        PrivateKeyInfo caPrivateKeyInfo = (PrivateKeyInfo) pemParser0.readObject();
-        pemParser0.close();
-        JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
-        PrivateKey caPrivateKey = converter.getPrivateKey(caPrivateKeyInfo);
-
         // load CSR file
-        String csrFilePath = "controllerCSR.csr";
-        PEMParser pemParser1 = new PEMParser(new FileReader(csrFilePath));
-        PKCS10CertificationRequest csr = (PKCS10CertificationRequest) pemParser1.readObject();
-        pemParser1.close();
+        PEMParser pemParserCSR = new PEMParser(new FileReader("controllerCSR.csr"));
+        PKCS10CertificationRequest csr = (PKCS10CertificationRequest) pemParserCSR.readObject();
+        pemParserCSR.close();
         // get public key
-        SubjectPublicKeyInfo publicKeyInfo = csr.getSubjectPublicKeyInfo();
-        PublicKey controllerPublicKey = converter.getPublicKey(publicKeyInfo);
+        SubjectPublicKeyInfo controllerPublicKeyInfo = csr.getSubjectPublicKeyInfo();
+        JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
+        PublicKey controllerPublicKey = converter.getPublicKey(controllerPublicKeyInfo);
         // get subject
         X500Name csrSubject = csr.getSubject();
         System.out.println("Subject of the CSR is: " + csrSubject);
+
         // TODO: check if subject has the right subnet address
 
+        // load CA's private key
+        PEMParser pemParserPrivateKey = new PEMParser(new FileReader("ca_ed25519_private.key"));
+        PrivateKeyInfo caPrivateKeyInfo = (PrivateKeyInfo) pemParserPrivateKey.readObject();
+        pemParserPrivateKey.close();
+        PrivateKey caPrivateKey = converter.getPrivateKey(caPrivateKeyInfo);
+        System.out.println(caPrivateKey);
+
+        /*
         try {
             Signature signature = Signature.getInstance(csr.getSignatureAlgorithm().getAlgorithm().getId(), "BC");
             signature.initVerify(controllerPublicKey);
@@ -61,7 +63,7 @@ public class VerifyX509CSR {
             signature.verify(csr.getSignature());
         } catch (Exception e) {
             throw new SignatureException("Error verifying CSR signature: " + e.getMessage(), e);
-        }
+        }*/
 
         // create infos for the new X509 certificate
         X500Name issuerName = new X500Name("CN=drasylCA, O=drasyl, C=DE, ST=HH, L=Hamburg");

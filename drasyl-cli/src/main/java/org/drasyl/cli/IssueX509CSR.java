@@ -1,16 +1,19 @@
 package org.drasyl.cli;
 
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
+import org.bouncycastle.util.io.pem.PemObject;
+import org.bouncycastle.util.io.pem.PemWriter;
 
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.Writer;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -28,9 +31,10 @@ public class IssueX509CSR {
         PublicKey publicKey = keyPairED25519.getPublic();
 
         // save the keys to files
-        saveKeyToFile(Base64.getEncoder().encodeToString(privateKey.getEncoded()), "controller_ed25519_private.key");
-        saveKeyToFile(Base64.getEncoder().encodeToString(publicKey.getEncoded()), "controller_ed25519_public.pem");
-        System.out.println("Keys saved successfully in Base64 format.");
+        PrivateKeyInfo privateKeyInfo = PrivateKeyInfo.getInstance(privateKey.getEncoded());
+        writeKeyToFile("PRIVATE KEY", privateKeyInfo.getEncoded(), "controller_ed25519_private.key");
+        SubjectPublicKeyInfo publicKeyInfo = SubjectPublicKeyInfo.getInstance(publicKey.getEncoded());
+        writeKeyToFile("PUBLIC KEY", publicKeyInfo.getEncoded(), "controller_ed25519_public.pem");
 
         // create only subject info for future certificate
         X500Name subjectName = new X500Name(createSubjectString());
@@ -42,20 +46,9 @@ public class IssueX509CSR {
         // build the CSR
         PKCS10CertificationRequest csr = csrBuilder.build(signer);
 
-        System.out.println("CSR generated:");
-        saveCSRToFile(csr);
+        System.out.println("CSR generated.");
+        writeCSRToFile(csr);
         System.out.println("CSR saved successfully.");
-    }
-
-    private static void saveCSRToFile(PKCS10CertificationRequest csr) throws IOException {
-        String beginString = "-----BEGIN CERTIFICATE REQUEST-----\n";
-        String endString = "\n-----END CERTIFICATE REQUEST-----\n";
-        String csrString = beginString + Base64.getEncoder().encodeToString(csr.getEncoded()) + endString;
-        try (FileWriter fileWriter = new FileWriter("controllerCSR.csr")) {
-            fileWriter.write(csrString);
-            //JcaPEMWriter pemWriter = new JcaPEMWriter(fileWriter);
-            //pemWriter.writeObject(csr);
-        }
     }
 
     private static String createSubjectString() {
@@ -68,9 +61,16 @@ public class IssueX509CSR {
         return "CN=" + subjectCN + ", O=" + subjectOrganizationName + ", OU=" + subjectOrganizationUnitName + ", C=" + subjectCountry + ", ST=" + subjectState + ", L=" + subjectLocation;
     }
 
-    private static void saveKeyToFile(String keyString, String filename) throws IOException {
-        try (FileWriter writer = new FileWriter(filename)) {
-            writer.write(keyString);
-        }
+    private static void writeCSRToFile(PKCS10CertificationRequest csr) throws IOException {
+        JcaPEMWriter pemWriter = new JcaPEMWriter(new FileWriter("controllerCSR.csr"));
+        pemWriter.writeObject(csr);
+        pemWriter.close();
+    }
+
+    private static void writeKeyToFile(String description, byte[] keyBytes, String filename) throws IOException {
+        PemObject pemObjectPublicKey = new PemObject(description, keyBytes);
+        PemWriter pemWriterPublicKey = new PemWriter(new FileWriter(filename));
+        pemWriterPublicKey.writeObject(pemObjectPublicKey);
+        pemWriterPublicKey.close();
     }
 }

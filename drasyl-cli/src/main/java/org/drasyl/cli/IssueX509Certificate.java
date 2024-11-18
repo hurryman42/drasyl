@@ -1,12 +1,18 @@
 package org.drasyl.cli;
 
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
+import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import org.bouncycastle.util.io.pem.PemObject;
+import org.bouncycastle.util.io.pem.PemWriter;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -34,13 +40,10 @@ public class IssueX509Certificate {
         PublicKey publicKey = keyPairED25519.getPublic();
 
         // save the keys to files
-        saveKeyToFile(Base64.getEncoder().encodeToString(privateKey.getEncoded()), "ca_ed25519_private.key");
-        saveKeyToFile(Base64.getEncoder().encodeToString(publicKey.getEncoded()), "ca_ed25519_public.pem");
-        System.out.println("Keys saved successfully in Base64 format.");
-
-        // use the generated keys to create a drasyl identity for the node
-        /*Identity nodeID = //generate Identity with the ed25519 keys;
-        //IdentityManager.writeIdentityFile(new File("node.identity").toPath(), nodeID);*/
+        PrivateKeyInfo privateKeyInfo = PrivateKeyInfo.getInstance(privateKey.getEncoded());
+        writeKeyToFile("PRIVATE KEY", privateKeyInfo.getEncoded(), "ca_ed25519_private.key");
+        SubjectPublicKeyInfo publicKeyInfo = SubjectPublicKeyInfo.getInstance(publicKey.getEncoded());
+        writeKeyToFile("PUBLIC KEY", publicKeyInfo.getEncoded(), "ca_ed25519_public.pem");
 
         /* failed: get ed25519 KeyPair from Identity & convert it into java.security.Private- & PublicKey
         Identity ID = IdentityManager.readIdentityFile(new File("drasyl.identity").toPath());
@@ -55,7 +58,7 @@ public class IssueX509Certificate {
 
         // create infos for X.509 certificate
         X500Name issuerName = new X500Name("CN=drasylCA, O=drasyl, C=DE, ST=HH, L=Hamburg");
-        X500Name subjectName = new X500Name(createSubjectString());
+        X500Name subjectName = new X500Name("CN=drasylCA, O=drasyl, C=DE, ST=HH, L=Hamburg");
         BigInteger serialNumber = BigInteger.valueOf(System.currentTimeMillis());
         Date notBefore = new Date(System.currentTimeMillis() - 1000L * 60 * 60 * 24); // yesterday
         Date notAfter = new Date(notBefore.getTime() + 1000L * 60 * 60 * 24 * 365); // a year after yesterday
@@ -79,25 +82,24 @@ public class IssueX509Certificate {
         // build the certificate
         X509Certificate certificate = new JcaX509CertificateConverter().getCertificate(certBuilder.build(signer));
 
-        System.out.println("X.509 certificate generated!");
+        System.out.println("X.509 certificate generated.");
         System.out.println(certificate);
-        saveCertificateToFile(certificate);
-        System.out.println("Certificate saved successfully.");
+        writeCertificateToFile(certificate);
+        System.out.println("X.509 certificate saved successfully.");
     }
 
-    private static void saveCertificateToFile(X509Certificate certificate) throws IOException, CertificateEncodingException {
-        String beginString = "-----BEGIN CERTIFICATE-----\n";
-        String endString = "\n-----END CERTIFICATE-----\n";
-        String certString = beginString + Base64.getEncoder().encodeToString(certificate.getEncoded()) + endString;
-        try (FileWriter fileWriter = new FileWriter("cacert.crt")) {
-            fileWriter.write(certString);
-        }
+    private static void writeCertificateToFile(X509Certificate certificate) throws IOException, CertificateEncodingException {
+        JcaPEMWriter pemWriter = new JcaPEMWriter(new FileWriter("cacert.crt"));
+        JcaX509CertificateHolder certificateHolder = new JcaX509CertificateHolder(certificate);
+        pemWriter.writeObject(certificateHolder);
+        pemWriter.close();
     }
 
-    private static void saveKeyToFile(String keyString, String filename) throws IOException {
-        try (FileWriter writer = new FileWriter(filename)) {
-            writer.write(keyString);
-        }
+    private static void writeKeyToFile(String description, byte[] keyBytes, String filename) throws IOException {
+        PemObject pemObjectPublicKey = new PemObject(description, keyBytes);
+        PemWriter pemWriterPublicKey = new PemWriter(new FileWriter(filename));
+        pemWriterPublicKey.writeObject(pemObjectPublicKey);
+        pemWriterPublicKey.close();
     }
 
     private static String createSubjectString() {
