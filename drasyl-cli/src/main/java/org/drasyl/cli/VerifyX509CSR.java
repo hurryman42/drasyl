@@ -5,10 +5,12 @@ import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
+import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
@@ -82,11 +84,9 @@ public class VerifyX509CSR {
     }
 
     private static void saveCertificateToFile(X509Certificate certificate) throws IOException, CertificateEncodingException {
-        String beginString = "-----BEGIN CERTIFICATE-----\n";
-        String endString = "\n-----END CERTIFICATE-----\n";
-        String certString = beginString + Base64.getEncoder().encodeToString(certificate.getEncoded()) + endString;
-        try (FileWriter fileWriter = new FileWriter("controllerCertificate.crt")) {
-            fileWriter.write(certString);
-        }
+        JcaPEMWriter pemWriter = new JcaPEMWriter(new FileWriter("controllerCertificate.crt"));
+        JcaX509CertificateHolder certificateHolder = new JcaX509CertificateHolder(certificate);
+        pemWriter.writeObject(certificateHolder);
+        pemWriter.close();
     }
 }
