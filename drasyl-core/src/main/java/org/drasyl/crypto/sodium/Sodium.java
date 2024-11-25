@@ -124,4 +124,6 @@ public class Sodium {
             byte[] nPub,
             byte[] k
     );
+
+    public native int crypto_sign_ed25519_seed_keypair(byte[] ed25519PublicKey, byte[] ed25519SecretKey, byte[] seed);
 }

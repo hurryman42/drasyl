@@ -233,4 +233,8 @@ public class DrasylSodiumWrapper {
     public Sodium getSodium() {
         return sodium;
     }
+
+    public boolean fullSecretKeyFromSeed(final byte[] publicKey, final byte[] secretKey, final byte[] seed) {
+        return successful(sodium.crypto_sign_ed25519_seed_keypair(publicKey, secretKey, seed));
+    }
 }
