@@ -20,12 +20,9 @@ import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Security;
-import java.security.cert.CertificateEncodingException;
 import java.util.Base64;
 
 public class CreateCSR {
-    public static final String BEGIN_KEY = "-----BEGIN PRIVATE KEY-----";
-    public static final String END_KEY = "-----END PRIVATE KEY-----";
     public static final String BEGIN_CSR = "-----BEGIN SIGNING REQUEST-----";
     public static final String END_CSR = "-----END SIGNING REQUEST-----";
     public static final String LINE_SEPARATOR = "\n";
@@ -34,24 +31,23 @@ public class CreateCSR {
      * given an ed25519 keypair and a subnet address it creates a CSR for that subnet
      * and saves it in PEM format under the given FilePath
      *
-     * @param String publicKeyFilePath
-     * @param String privateKeyFilePath
-     * @param String subnet
-     * @param String CSRFilePath
-     * @throws IOException
-     * @throws OperatorCreationException
+     * @param args a string array consisting of the file paths for the public and private key as well as the subnet string and the name under which the CSR should be saved
+     * @throws IOException thrown when something goes wrong with reading the files
+     * @throws OperatorCreationException thrown when something went wrong with the certificate building
      */
     public static void main(String[] args) throws IOException, OperatorCreationException {
         Security.addProvider(new BouncyCastleProvider());
 
-        // load keys
         String publicKeyFilePath = args[0];
         String privateKeyFilePath = args[1];
+        String subnet = args[2];
+        String csrFilePath = args[3];
+
+        // load keys
         PublicKey publicKey = loadPublicKey(publicKeyFilePath);
         PrivateKey privateKey = loadPrivateKey(privateKeyFilePath);
 
         // create only subject info for future certificate
-        String subnet = args[2];
         X500Name subjectName = new X500Name(createSubjectString(subnet));
 
         // create CSR builder
@@ -62,8 +58,8 @@ public class CreateCSR {
         PKCS10CertificationRequest csr = csrBuilder.build(signer);
 
         //convertCSRToPemString(csr);
-        writeCSRToFile(csr, args[3]);
-        System.out.println("CSR successfully saved as " + args[3]);
+        writeCSRToFile(csr, csrFilePath);
+        System.out.println("CSR successfully saved as " + csrFilePath);
     }
 
     private static PrivateKey loadPrivateKey(String privateKeyFilePath) throws IOException {
@@ -97,7 +93,7 @@ public class CreateCSR {
         pemWriter.close();
     }
 
-    private static String convertCSRToPemString(final PKCS10CertificationRequest csr) throws CertificateEncodingException, IOException {
+    private static String convertCSRToPemString(final PKCS10CertificationRequest csr) throws IOException {
         Base64.Encoder encoder = Base64.getMimeEncoder(64, LINE_SEPARATOR.getBytes(StandardCharsets.UTF_8));
         byte[] csrBytes = csr.getEncoded();
 

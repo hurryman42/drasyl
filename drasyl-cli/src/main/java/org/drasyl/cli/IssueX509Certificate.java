@@ -34,16 +34,16 @@ public class IssueX509Certificate {
         Security.addProvider(new BouncyCastleProvider());
 
         // generate the keys
-        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("Ed25519", "BC");
+        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("Ed25519");
         java.security.KeyPair keyPairED25519 = keyPairGenerator.generateKeyPair();
-        PrivateKey privateKey = keyPairED25519.getPrivate();
         PublicKey publicKey = keyPairED25519.getPublic();
+        PrivateKey privateKey = keyPairED25519.getPrivate();
 
         // save the keys to files
-        PrivateKeyInfo privateKeyInfo = PrivateKeyInfo.getInstance(privateKey.getEncoded());
-        writeKeyToFile("PRIVATE KEY", privateKeyInfo.getEncoded(), "ca_ed25519_private.key");
-        SubjectPublicKeyInfo publicKeyInfo = SubjectPublicKeyInfo.getInstance(publicKey.getEncoded());
-        writeKeyToFile("PUBLIC KEY", publicKeyInfo.getEncoded(), "ca_ed25519_public.pem");
+        //SubjectPublicKeyInfo publicKeyInfo = SubjectPublicKeyInfo.getInstance(publicKey.getEncoded());
+        writeKeyToFile("PUBLIC KEY", publicKey.getEncoded(), "ca_public.pem");
+        //PrivateKeyInfo privateKeyInfo = PrivateKeyInfo.getInstance(privateKey.getEncoded());
+        writeKeyToFile("PRIVATE KEY", privateKey.getEncoded(), "ca_private.key");
 
         /* failed: get ed25519 KeyPair from Identity & convert it into java.security.Private- & PublicKey
         Identity ID = IdentityManager.readIdentityFile(new File("drasyl.identity").toPath());
@@ -90,8 +90,8 @@ public class IssueX509Certificate {
 
     private static void writeCertificateToFile(X509Certificate certificate) throws IOException, CertificateEncodingException {
         JcaPEMWriter pemWriter = new JcaPEMWriter(new FileWriter("cacert.crt"));
-        JcaX509CertificateHolder certificateHolder = new JcaX509CertificateHolder(certificate);
-        pemWriter.writeObject(certificateHolder);
+        //JcaX509CertificateHolder certificateHolder = new JcaX509CertificateHolder(certificate);
+        pemWriter.writeObject(certificate);
         pemWriter.close();
     }
 
