@@ -38,6 +38,7 @@ import static org.drasyl.crypto.Crypto.INSTANCE;
 import static org.drasyl.crypto.sodium.DrasylSodiumWrapper.CURVE25519_SECRETKEYBYTES;
 import static org.drasyl.crypto.sodium.DrasylSodiumWrapper.ED25519_PUBLICKEYBYTES;
 import static org.drasyl.crypto.sodium.DrasylSodiumWrapper.ED25519_SECRETKEYBYTES;
+import static org.drasyl.identity.Identity.POW_DIFFICULTY;
 
 public class GenerateIdentity {
     public static final String BEGIN_KEY = "-----BEGIN PRIVATE KEY-----";
@@ -57,6 +58,7 @@ public class GenerateIdentity {
 
         String publicKeyFileName = args[0];
         String privateKeyFileName = args[1];
+        String identityFilePath = args[2];
 
         // generate the keys
         KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("Ed25519");
@@ -77,13 +79,12 @@ public class GenerateIdentity {
 
         IdentitySecretKey idSecKey = IdentitySecretKey.of(secretKeyBytes);
         IdentityPublicKey idPubKey = IdentityPublicKey.of(publicKeyBytes);
-        byte difficulty = 1;
-        ProofOfWork pow = ProofOfWork.generateProofOfWork(idPubKey, difficulty);
+        ProofOfWork pow = ProofOfWork.generateProofOfWork(idPubKey, POW_DIFFICULTY);
         KeyPair<IdentityPublicKey, IdentitySecretKey> identityKeyPair = KeyPair.of(idPubKey, idSecKey);
         KeyPair<KeyAgreementPublicKey, KeyAgreementSecretKey> agreementKeyPair = Crypto.INSTANCE.convertLongTimeKeyPairToKeyAgreementKeyPair(identityKeyPair);
         Identity id = Identity.of(pow,identityKeyPair,agreementKeyPair);
 
-        IdentityManager.writeIdentityFile(Path.of("generated.identity"), id);
+        IdentityManager.writeIdentityFile(Path.of(identityFilePath), id);
     }
 
     public static byte[] convertSecretKeyEd25519(final String secretKey) throws CryptoException {

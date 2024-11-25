@@ -74,4 +74,6 @@ public class ControllerHello implements SdonMessage {
     public int hashCode() {
         return Objects.hashCode(policies);
     }
+
+    //TODO: add a certificate check in the usages of this class
 }
