@@ -22,10 +22,13 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Security;
+import java.security.SignatureException;
 import java.security.cert.CertPath;
 import java.security.cert.CertPathValidator;
 import java.security.cert.CertPathValidatorException;
@@ -41,27 +44,24 @@ import java.util.Date;
 import java.util.List;
 
 public class SignCertificate {
-    public static final String BEGIN_CERT = "-----BEGIN CERTIFICATE-----";
-    public static final String END_CERT = "-----END CERTIFICATE-----";
-    public static final String LINE_SEPARATOR = "\n";
     private static PKIXParameters PKIX_PARAMETERS;
 
     /**
      * Signs a CSR and therefore creates a new certificate.
      * With "me" in the commands and variable names I refer to the executing entity (a (sub-)controller or the CA)
      *
-     * @param args a string array consisting of the file paths for the own private key, the own certificate, the CSR & the to be created certificate
+     * @param args a string array consisting of the file paths for the own private key, the current certificate chain, the CSR & the to be created certificate chain
      * @throws IOException thrown when something goes wrong with reading the files
      * @throws OperatorCreationException thrown when something went wrong with the certificate building
      * @throws CertificateException thrown when there are problems loading/reading a certificate
      */
-    public static void main(String[] args) throws IOException, OperatorCreationException, CertificateException {
+    public static void main(String[] args) throws IOException, OperatorCreationException, CertificateException, NoSuchAlgorithmException, SignatureException, InvalidKeyException, NoSuchProviderException {
         Security.addProvider(new BouncyCastleProvider());
 
         String myPrivateKeyFilePath = args[0];
-        String certChainFilePath = args[1];
+        String currentCertChainFilePath = args[1];
         String csrFilePath = args[2];
-        String certFilePath = args[3];
+        String newCertChainFilePath = args[3];
 
         // load CSR file
         PEMParser pemParserCSR = new PEMParser(new FileReader(csrFilePath));
@@ -99,12 +99,9 @@ public class SignCertificate {
         PrivateKey myPrivateKey = converter.getPrivateKey(myPrivateKeyInfo);
         System.out.println(myPrivateKey);
 
-        // load my certificate out of the certificate chain and then also the entire chain into the list of certificates
-        //FileInputStream inputStream = new FileInputStream(certChainFilePath);
-        //CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
-        //X509Certificate myCert = (X509Certificate) certificateFactory.generateCertificate(inputStream);
+        // load my certificate out of the certificate chain & then also the entire chain into the list of certificates
         List<X509Certificate> certificates = new ArrayList<>();
-        PEMParser pemParserCerts = new PEMParser(new FileReader(certChainFilePath));
+        PEMParser pemParserCerts = new PEMParser(new FileReader(currentCertChainFilePath));
         X509CertificateHolder myCertHolder = (X509CertificateHolder) pemParserCerts.readObject();
         X509Certificate myCert = new JcaX509CertificateConverter().getCertificate(myCertHolder);
         certificates.add(myCert);
@@ -116,15 +113,16 @@ public class SignCertificate {
                 certificates.add(cert);
             }
         }
+        pemParserCerts.close();
 
-        // load cacert as root certificate and add it as a trust anchor
-        //String rootCertFilePath = "cacert.crt";
-        //PEMParser pemParserRootCert = new PEMParser(new FileReader(rootCertFilePath));
-        //X509Certificate rootCert = (X509Certificate) pemParserRootCert.readObject();
-        //Set<TrustAnchor> trustAnchors = new HashSet<>();
-        //trustAnchors.add(new TrustAnchor(rootCert, null));
-        //PKIX_PARAMETERS = new PKIXParameters(trustAnchors);
-        //PKIX_PARAMETERS.setRevocationEnabled(false);
+        // load cacert as root certificate & add it as a trust anchor
+        /*String rootCertFilePath = "cacert.crt";
+        PEMParser pemParserRootCert = new PEMParser(new FileReader(rootCertFilePath));
+        X509Certificate rootCert = (X509Certificate) pemParserRootCert.readObject();
+        Set<TrustAnchor> trustAnchors = new HashSet<>();
+        trustAnchors.add(new TrustAnchor(rootCert, null));
+        PKIX_PARAMETERS = new PKIXParameters(trustAnchors);
+        PKIX_PARAMETERS.setRevocationEnabled(false);*/
 
         // create infos for the new X509 certificate
         BigInteger serialNumber = BigInteger.valueOf(System.currentTimeMillis());
@@ -133,14 +131,27 @@ public class SignCertificate {
 
         // create certificate builder (subject taken from CSR)
         X509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(myCert, serialNumber, notBefore, notAfter, csrSubject, csrPublicKey);
+        /* define & add a policy as a custom extension
+        String customExtensionOID = "1.2.3.4.5";
+        byte[] extensionValue = "policy".getBytes(); // convert subnet string to bytes
+        certBuilder.addExtension(new ASN1ObjectIdentifier(customExtensionOID), false, extensionValue);*/
         // create a content signer
         ContentSigner signer = new JcaContentSignerBuilder("Ed25519").setProvider("BC").build(myPrivateKey);
         // build the certificate
         X509Certificate certificate = new JcaX509CertificateConverter().getCertificate(certBuilder.build(signer));
 
+        //DEBUG: Does verifying the certificate with the ca public key work?
+        /*PEMParser pemParserPublicKey = new PEMParser(new FileReader("ca_ed25519_public.pem"));
+        Object obj = pemParserPublicKey.readObject();
+        pemParserPublicKey.close();
+        PublicKey myPublicKey = converter.getPublicKey((SubjectPublicKeyInfo) obj);
+        System.out.println(myPublicKey);
+        certificate.verify(myPublicKey);
+        System.out.println("Verifying with caPublicKey worked!");*/
+
         //saveCertificateToFile(certificate, "signed.crt"); // just the signed certificate, not the rest of the chain
         certificates.add(certificate); // add the newly signed certificate to the chain
-        saveCertificateChainToFile(certificates, certFilePath);
+        saveCertificateChainToFile(certificates, newCertChainFilePath);
     }
 
     private static void saveCertificateToFile(X509Certificate certificate, String certFilePath) throws IOException {
@@ -161,10 +172,9 @@ public class SignCertificate {
     }
 
     private static String convertCertToPemString(final X509Certificate certificate) throws CertificateEncodingException {
-        Base64.Encoder encoder = Base64.getMimeEncoder(64, LINE_SEPARATOR.getBytes(StandardCharsets.UTF_8));
+        Base64.Encoder encoder = Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.UTF_8));
         byte[] cert = certificate.getEncoded();
-
-        return BEGIN_CERT + LINE_SEPARATOR + encoder.encodeToString(cert) + LINE_SEPARATOR + END_CERT;
+        return "-----BEGIN CERTIFICATE-----" + "\n" + encoder.encodeToString(cert) + "\n" + "-----END CERTIFICATE-----";
     }
 
     private boolean validateCertificateChain(final X509Certificate... certificates) {

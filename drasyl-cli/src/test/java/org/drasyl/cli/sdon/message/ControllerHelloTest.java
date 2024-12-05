@@ -23,14 +23,20 @@ package org.drasyl.cli.sdon.message;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.embedded.EmbeddedChannel;
+import org.bouncycastle.openssl.PEMParser;
 import org.drasyl.cli.sdon.config.LinkPolicy;
 import org.drasyl.cli.sdon.config.TunPolicy;
 import org.drasyl.handler.codec.JacksonCodec;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.io.FileReader;
+import java.io.IOException;
 import java.net.InetAddress;
-import java.net.UnknownHostException;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -43,7 +49,7 @@ class ControllerHelloTest {
     @Nested
     class Serialization {
         @Test
-        void shouldBeSerializableAndDeserializable() throws UnknownHostException {
+        void shouldBeSerializableAndDeserializable() throws IOException {
             final JacksonCodec<SdonMessage> handler = new JacksonCodec<>(OBJECT_MAPPER, SdonMessage.class);
             final EmbeddedChannel channel = new EmbeddedChannel(handler);
 
@@ -60,6 +66,8 @@ class ControllerHelloTest {
                             "n1",
                             ID_1.getAddress()
                     )
+            ), List.of(
+                    Files.readString(Path.of("cacert.crt"))
             ));
 
             // serialize
@@ -74,6 +82,28 @@ class ControllerHelloTest {
 
             channel.checkException();
             channel.close();
+        }
+
+        @Test
+        void printable() throws IOException {
+            final ControllerHello msg = new ControllerHello(Set.of(
+                    new TunPolicy(
+                            InetAddress.getByName("127.0.0.1"),
+                            (short) 8,
+                            Map.of(
+                                    InetAddress.getByName("127.0.0.1"),
+                                    ID_1.getAddress()
+                            )
+                    ),
+                    new LinkPolicy(
+                            "n1",
+                            ID_1.getAddress()
+                    )
+            ), List.of(
+                    Files.readString(Path.of("cacert.crt"))
+            ));
+
+            System.out.println(OBJECT_MAPPER.writeValueAsString(msg));
         }
     }
 }

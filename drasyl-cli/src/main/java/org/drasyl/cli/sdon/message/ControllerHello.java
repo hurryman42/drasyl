@@ -26,6 +26,8 @@ import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.drasyl.cli.sdon.config.Policy;
 
+import java.security.cert.X509Certificate;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
@@ -35,15 +37,18 @@ import static java.util.Objects.requireNonNull;
  * Message sent from the controller to all devices.
  */
 public class ControllerHello implements SdonMessage {
+    // policies later as certificate extensions?
     private final Set<Policy> policies;
+    private final List<String> certificates;
 
     @JsonCreator
-    public ControllerHello(@JsonProperty("policies") final Set<Policy> policies) {
+    public ControllerHello(@JsonProperty("policies") final Set<Policy> policies, @JsonProperty("certificates") final List<String> certificates) {
         this.policies = requireNonNull(policies);
+        this.certificates = requireNonNull(certificates);
     }
 
     public ControllerHello() {
-        this(Set.of());
+        this(Set.of(), List.of());
     }
 
     @JsonGetter
@@ -51,10 +56,16 @@ public class ControllerHello implements SdonMessage {
         return policies;
     }
 
+    @JsonGetter
+    public List<String> certificates() {
+        return certificates;
+    }
+
     @Override
     public String toString() {
         return "ControllerHello{" +
                 "policies='" + policies + '\'' +
+                "certificates='" + certificates + '\'' +
                 '}';
     }
 
@@ -67,13 +78,12 @@ public class ControllerHello implements SdonMessage {
             return false;
         }
         final ControllerHello that = (ControllerHello) o;
-        return Objects.equals(policies, that.policies);
+        return (Objects.equals(policies, that.policies) && Objects.equals(certificates, that.certificates));
     }
 
+    // TODO: add certificates hash code; how?
     @Override
     public int hashCode() {
         return Objects.hashCode(policies);
     }
-
-    //TODO: add a certificate check in the usages of this class
 }

@@ -24,6 +24,9 @@ package org.drasyl.cli.sdon.handler;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.openssl.PEMParser;
 import org.drasyl.channel.DrasylChannel;
 import org.drasyl.channel.DrasylServerChannel;
 import org.drasyl.cli.sdon.config.Device;
@@ -40,9 +43,13 @@ import org.drasyl.util.logging.Logger;
 import org.drasyl.util.logging.LoggerFactory;
 import org.luaj.vm2.LuaString;
 
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -125,14 +132,17 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                             }
                         }
                         final Set<Policy> policies;
+                        final List<String> certificates;
                         if (node != null) {
                             policies = node.createPolicies();
+                            certificates = node.loadCertificates("certificate.crt");
                         }
                         else {
                             policies = Set.of();
+                            certificates = List.of();
                         }
 
-                        final ControllerHello controllerHello = new ControllerHello(policies);
+                        final ControllerHello controllerHello = new ControllerHello(policies, certificates);
                         LOG.debug("Send {} to {}.", controllerHello, device.address());
                         final DrasylChannel channel = ((DrasylServerChannel) ctx.channel()).getChannels().get(device.address());
                         channel.writeAndFlush(controllerHello).addListener(FIRE_EXCEPTION_ON_FAILURE);
