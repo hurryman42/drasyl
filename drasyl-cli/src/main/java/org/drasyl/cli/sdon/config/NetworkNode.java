@@ -156,7 +156,11 @@ public class NetworkNode extends LuaTable {
         String certsString = Files.readString(Path.of(certFilePath));
         String[] certs = certsString.split("-----END CERTIFICATE-----");
         for (int i=0; i<(certs.length-1); i++) {
-            certificates.add(certs[i] + "-----END CERTIFICATE-----");
+            String cert = certs[i] + "-----END CERTIFICATE-----\n";
+            if (cert.startsWith("\n")) {
+                cert = cert.substring(1);
+            }
+            certificates.add(cert);
         }
         /*PEMParser pemParserCerts = new PEMParser(new FileReader(certFilePath));
         Object object;

@@ -149,45 +149,49 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
             if (sender.equals(controller) && msg instanceof ControllerHello) {
                 final List<String> certificates = ((ControllerHello) msg).certificates();
 
-                /*PEMParser pemParserRootCert = new PEMParser(new FileReader(rootCertFilePath));
-                X509Certificate rootCert = (X509Certificate) pemParserRootCert.readObject();
-                String rootCertString = convertCertToPem(rootCert);*/
+                if (!certificates.isEmpty() && !((ControllerHello) msg).policies().isEmpty()) {
+                    /*PEMParser pemParserRootCert = new PEMParser(new FileReader(rootCertFilePath));
+                    X509Certificate rootCert = (X509Certificate) pemParserRootCert.readObject();
+                    String rootCertString = convertCertToPem(rootCert);*/
 
-                // load rootCertificate from file & check whether it equals the last certificate in the message
-                String rootCertFilePath = "cacert.crt";
-                String rootCertString = Files.readString(Path.of(rootCertFilePath));
-                if (!certificates.get(certificates.size()-1).equals(rootCertString)) {
-                    throw new CertificateException("Not the right root certificate!");
+                    // load rootCertificate from file & check whether it equals the last certificate in the message
+                    String rootCertFilePath = "cacert.crt";
+                    String rootCertString = Files.readString(Path.of(rootCertFilePath));
+                    if (!(certificates.get(certificates.size()-1).equals(rootCertString))) {
+                        throw new CertificateException("Not the right root certificate!");
+                    }
+
+                    // check validity of the sender's certificates
+                    CertificateFactory cf = CertificateFactory.getInstance("X.509");
+                    for (int i=0; i<certificates.size()-1; i++) {
+                        // load current certificate
+                        String certificateString = certificates.get(i);
+                        X509Certificate certificate = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(certificateString.getBytes()));
+
+                        // load next certificate (one up the chain)
+                        String nextCertString = certificates.get(i+1);
+                        X509Certificate nextCert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(nextCertString.getBytes()));
+
+                        // check expiration dates
+                        certificate.checkValidity(new Date());
+                        nextCert.checkValidity(new Date());
+
+                        // verify current certificate with the public key of the next certificate
+                        PublicKey nextPubKey = nextCert.getPublicKey();
+                        certificate.verify(nextPubKey);
+                    }
+
+                    // check subnet address
+                    String certString = certificates.get(0);
+                    X509Certificate cert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(certString.getBytes()));
+                    X500Name subject = new JcaX509CertificateHolder(cert).getSubject();
+                    String subnet = subject.toString();
+                    out.println("Valid X.509 certificate for subnet " + subnet);
+                    // TODO: how to get the device's ip address?
                 }
-
-                // check validity of the sender's certificates
-                CertificateFactory cf = CertificateFactory.getInstance("X.509");
-                for (int i=0; i<certificates.size()-1; i++) {
-                    // load current certificate
-                    String certificateString = certificates.get(i);
-                    X509Certificate certificate = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(certificateString.getBytes()));
-
-                    // load next certificate (one up the chain)
-                    String nextCertString = certificates.get(i+1);
-                    X509Certificate nextCert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(nextCertString.getBytes()));
-
-                    // check expiration dates
-                    certificate.checkValidity(new Date());
-                    nextCert.checkValidity(new Date());
-
-                    // verify current certificate with the public key of the next certificate
-                    PublicKey nextPubKey = nextCert.getPublicKey();
-                    certificate.verify(nextPubKey);
+                else if (certificates.isEmpty() && !((ControllerHello) msg).policies().isEmpty()) {
+                    throw new CertificateException("No certificates although there are policies.");
                 }
-
-                // check subnet address
-                String certString = certificates.get(0);
-                X509Certificate cert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(certString.getBytes()));
-                X500Name subject = new JcaX509CertificateHolder(cert).getSubject();
-                String subnet = subject.toString();
-                out.println("Valid X.509 certificate for subnet " + subnet);
-                // TODO: how to get the device's ip address?
-
 
                 // set state to JOINED if it is not already
                 if (state != JOINED) {

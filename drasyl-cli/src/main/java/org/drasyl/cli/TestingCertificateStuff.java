@@ -26,9 +26,9 @@ public class TestingCertificateStuff {
 
             FileInputStream inputStream1 = new FileInputStream("cacert.crt");
             X509Certificate caCertificate = (X509Certificate) certificateFactory.generateCertificate(inputStream1);
-            System.out.println(caCertificate);
+            //System.out.println(caCertificate);
             //System.out.println(convertCertToPem(caCertificate));
-            System.out.println("----------------------------------------");
+            //System.out.println("----------------------------------------");
             // testing the verify function
             PublicKey caPubKey = caCertificate.getPublicKey();
             caCertificate.verify(caPubKey);
@@ -40,27 +40,35 @@ public class TestingCertificateStuff {
             //controllerCertificate.verify(caCertificate.getPublicKey());
             //System.out.println("Certificate is valid.");
 
+            String rootCertFilePath = "cacert.crt";
+            String rootCertString = Files.readString(Path.of(rootCertFilePath));
+            //System.out.println(rootCertString);
+
             List<String> certificates = new ArrayList<>();
             String certsString = Files.readString(Path.of("chain.crt"));
             String[] certs = certsString.split("-----END CERTIFICATE-----");
             for (int i=0; i<(certs.length-1); i++) {
-                certificates.add(certs[i] + "-----END CERTIFICATE-----");
+                String cert = certs[i] + "-----END CERTIFICATE-----\n";
+                if (cert.startsWith("\n")) {
+                    cert = cert.substring(1);
+                }
+                certificates.add(cert);
             }
-            //System.out.println(certificates);
+            System.out.println(certificates);
 
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
             for (int i=0; i<certificates.size()-1; i++) {
                 // load current certificate
                 String certificateString = certificates.get(i);
                 X509Certificate certificate = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(certificateString.getBytes()));
-                System.out.println(certificate);
-                System.out.println("----------------------------------------");
+                //System.out.println(certificate);
+                //System.out.println("----------------------------------------");
 
                 // load next certificate (one up the chain)
                 String nextCertString = certificates.get(i+1);
                 X509Certificate nextCert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(nextCertString.getBytes()));
-                System.out.println(nextCert);
-                System.out.println("----------------------------------------");
+                //System.out.println(nextCert);
+                //System.out.println("----------------------------------------");
 
                 // check expiration dates
                 certificate.checkValidity(new Date());
@@ -68,7 +76,7 @@ public class TestingCertificateStuff {
 
                 // verify current certificate with the public key of the next certificate
                 PublicKey PubKey = nextCert.getPublicKey();
-                System.out.println(PubKey);
+                //System.out.println(PubKey);
                 certificate.verify(PubKey);
                 System.out.println("Certificate is valid.");
             }
