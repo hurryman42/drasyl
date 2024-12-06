@@ -135,7 +135,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                         final List<String> certificates;
                         if (node != null) {
                             policies = node.createPolicies();
-                            certificates = node.loadCertificates("certificate.crt");
+                            certificates = node.loadCertificates("chain.crt");
                         }
                         else {
                             policies = Set.of();

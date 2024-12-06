@@ -151,7 +151,7 @@ public class NetworkNode extends LuaTable {
         }
     }
 
-    public List<String> loadCertificates(String certFilePath) throws IOException, CertificateException {
+    public List<String> loadCertificates(String certFilePath) throws IOException {
         List<String> certificates = new ArrayList<>();
         String certsString = Files.readString(Path.of(certFilePath));
         String[] certs = certsString.split("-----END CERTIFICATE-----");
