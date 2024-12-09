@@ -30,6 +30,7 @@ import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.drasyl.channel.DrasylServerChannel;
 import org.drasyl.cli.sdon.config.Policy;
+import org.drasyl.cli.sdon.config.TunPolicy;
 import org.drasyl.cli.sdon.event.SdonMessageReceived;
 import org.drasyl.cli.sdon.message.ControllerHello;
 import org.drasyl.cli.sdon.message.DeviceHello;
@@ -42,6 +43,7 @@ import org.drasyl.util.logging.LoggerFactory;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -57,6 +59,7 @@ import java.security.cert.X509Certificate;
 import java.util.Base64;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -140,7 +143,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void userEventTriggered(final ChannelHandlerContext ctx,
-                                   final Object evt) throws CertificateException, NoSuchAlgorithmException, SignatureException, InvalidKeyException, NoSuchProviderException, IOException {
+                                   final Object evt) throws Exception {
         if (evt instanceof SdonMessageReceived) {
             final DrasylAddress sender = ((SdonMessageReceived) evt).address();
             final SdonMessage msg = ((SdonMessageReceived) evt).msg();
@@ -148,12 +151,9 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
 
             if (sender.equals(controller) && msg instanceof ControllerHello) {
                 final List<String> certificates = ((ControllerHello) msg).certificates();
+                //certificates.replaceAll(s -> s.replace("\n", ""));
 
                 if (!certificates.isEmpty() && !((ControllerHello) msg).policies().isEmpty()) {
-                    /*PEMParser pemParserRootCert = new PEMParser(new FileReader(rootCertFilePath));
-                    X509Certificate rootCert = (X509Certificate) pemParserRootCert.readObject();
-                    String rootCertString = convertCertToPem(rootCert);*/
-
                     // load rootCertificate from file & check whether it equals the last certificate in the message
                     String rootCertFilePath = "cacert.crt";
                     String rootCertString = Files.readString(Path.of(rootCertFilePath));
@@ -185,9 +185,53 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                     String certString = certificates.get(0);
                     X509Certificate cert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(certString.getBytes()));
                     X500Name subject = new JcaX509CertificateHolder(cert).getSubject();
-                    String subnet = subject.toString();
+                    String subjectString = subject.toString();
+                    String[] subjectInfos = subjectString.split(",");
+                    String subnet = subjectInfos[0].substring(3);
                     out.println("Valid X.509 certificate for subnet " + subnet);
-                    // TODO: how to get the device's ip address?
+                    String[] subnetSplit = subnet.split("/");
+                    InetAddress subnetAddress = InetAddress.getByName(subnetSplit[0]);
+                    byte[] subnetAddressBytes = subnetAddress.getAddress();
+                    short subnetNetmask = Short.parseShort(subnetSplit[1]);
+
+                    Set<Policy> policies = ((ControllerHello) msg).policies();
+                    for (Policy policy : policies) {
+                        if (policy instanceof TunPolicy) {
+                            TunPolicy tunPolicy = (TunPolicy) policy;
+                            InetAddress ipAddress = tunPolicy.address();
+                            byte[] ipAddressBytes = ipAddress.getAddress();
+
+                            short netmask = tunPolicy.netmask();
+
+                            int numBytesToMask = subnetNetmask / 8;
+                            int remainingBits = subnetNetmask % 8;
+
+                            byte[] mask = new byte[ipAddressBytes.length];
+                            for (int i=0; i<numBytesToMask; i++) {
+                                mask[i] = (byte) 0xFF;
+                            }
+                            if (remainingBits > 0) {
+                                mask[numBytesToMask] = (byte) (0xFF << (8-remainingBits));
+                            }
+
+                            byte[] maskedIp = new byte[ipAddressBytes.length];
+                            byte[] maskedSubnet = new byte[subnetAddressBytes.length];
+                            for (int i=0; i<ipAddressBytes.length; i++) {
+                                maskedIp[i] = (byte) (ipAddressBytes[i] & mask[i]);
+                                maskedSubnet[i] = (byte) (subnetAddressBytes[i] & mask[i]);
+                            }
+
+                            if (!(InetAddress.getByAddress(maskedIp).equals(InetAddress.getByAddress(maskedSubnet)))) {
+                                throw new Exception("IP address in policy does not fit in the subnet specified in the controller's certificate!");
+                            }
+                            else {
+                                out.println("Success: IP address in policy fits in the subnet specified in the controller's certificate!");
+                            }
+                            /*if (!(netmask == subnetNetmask)) {
+                                throw new Exception("The netmask of the IP address from the policy is not the same as netmask from the controller's certificate.");
+                            }*/
+                        }
+                    }
                 }
                 else if (certificates.isEmpty() && !((ControllerHello) msg).policies().isEmpty()) {
                     throw new CertificateException("No certificates although there are policies.");
