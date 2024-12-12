@@ -143,7 +143,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                         }
 
                         final ControllerHello controllerHello = new ControllerHello(policies, certificates);
-                        LOG.debug("Send {} to {}.", controllerHello, device.address());
+                        LOG.debug("Send {} to {}.", controllerHello.toString().replace("\n", ""), device.address());
                         final DrasylChannel channel = ((DrasylServerChannel) ctx.channel()).getChannels().get(device.address());
                         if (channel != null) {
                             channel.writeAndFlush(controllerHello).addListener(FIRE_EXCEPTION_ON_FAILURE);

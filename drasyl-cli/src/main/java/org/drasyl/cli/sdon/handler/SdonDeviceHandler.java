@@ -147,7 +147,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
         if (evt instanceof SdonMessageReceived) {
             final DrasylAddress sender = ((SdonMessageReceived) evt).address();
             final SdonMessage msg = ((SdonMessageReceived) evt).msg();
-            LOG.debug("Received from `{}`: {}", sender, msg);
+            LOG.debug("Received from `{}`: {}", sender, msg.toString().replace("\n", ""));
 
             if (sender.equals(controller) && msg instanceof ControllerHello) {
                 final List<String> certificates = ((ControllerHello) msg).certificates();
