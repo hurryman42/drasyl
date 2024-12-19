@@ -119,7 +119,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>11</java.version>
-        <logback.version>1.5.12</logback.version>
+        <logback.version>1.5.13</logback.version>
         <junit.version>5.11.4</junit.version>
         <mockito.version>5.14.2</mockito.version>
         <jackson.version>2.18.2</jackson.version>
@@ -131,7 +131,7 @@
         <typesafe.config.version>1.4.3</typesafe.config.version>
         <jetbrains.annotations.version>20.1.0</jetbrains.annotations.version>
         <json-unit-assertj.version>2.40.1</json-unit-assertj.version>
-        <protobuf.version>4.29.1</protobuf.version>
+        <protobuf.version>4.29.2</protobuf.version>
         <auto-value.version>1.11.0</auto-value.version>
         <jna.version>5.15.0</jna.version>
         <sonar.organization>drasyl-overlay</sonar.organization>
