@@ -152,7 +152,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                     // load rootCertificate from file & check whether it equals the last certificate in the message
                     final String rootCertFilePath = "cacert.crt";
                     final String rootCertString = Files.readString(Path.of(rootCertFilePath));
-                    if (!(certificates.get(certificates.size()-1).equals(rootCertString))) {
+                    if (!(certificates.get(certificates.size() - 1).equals(rootCertString))) {
                         throw new CertificateException("Not the right root certificate!");
                     }
 

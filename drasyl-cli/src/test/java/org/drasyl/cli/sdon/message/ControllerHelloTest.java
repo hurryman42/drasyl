@@ -23,17 +23,14 @@ package org.drasyl.cli.sdon.message;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.embedded.EmbeddedChannel;
-import org.bouncycastle.openssl.PEMParser;
 import org.drasyl.cli.sdon.config.LinkPolicy;
 import org.drasyl.cli.sdon.config.TunPolicy;
 import org.drasyl.handler.codec.JacksonCodec;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import java.io.FileReader;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;

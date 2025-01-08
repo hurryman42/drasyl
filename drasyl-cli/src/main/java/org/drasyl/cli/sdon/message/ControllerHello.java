@@ -26,7 +26,6 @@ import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.drasyl.cli.sdon.config.Policy;
 
-import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
