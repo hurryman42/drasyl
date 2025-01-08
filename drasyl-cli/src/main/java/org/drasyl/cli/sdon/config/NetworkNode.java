@@ -21,18 +21,13 @@
  */
 package org.drasyl.cli.sdon.config;
 
-import org.bouncycastle.cert.X509CertificateHolder;
-import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
-import org.bouncycastle.openssl.PEMParser;
 import org.drasyl.cli.util.LuaHelper;
 import org.drasyl.identity.DrasylAddress;
 import org.drasyl.identity.IdentityPublicKey;
 import org.luaj.vm2.LuaString;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
-import org.luaj.vm2.ast.Str;
 
-import java.io.FileReader;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -40,7 +35,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.cert.CertificateEncodingException;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -152,17 +146,17 @@ public class NetworkNode extends LuaTable {
     }
 
     public List<String> loadCertificates(String certFilePath) throws IOException {
-        List<String> certificates = new ArrayList<>();
-        String certsString = Files.readString(Path.of(certFilePath));
-        String[] certs = certsString.split("-----END CERTIFICATE-----");
-        for (int i=0; i<(certs.length-1); i++) {
+        final List<String> certificates = new ArrayList<>();
+        final String certsString = Files.readString(Path.of(certFilePath));
+        final String[] certs = certsString.split("-----END CERTIFICATE-----");
+        for (int i = 0; i < (certs.length - 1); i++) {
             String cert = certs[i] + "-----END CERTIFICATE-----\n";
             if (cert.startsWith("\n")) {
                 cert = cert.substring(1);
             }
             certificates.add(cert);
         }
-        /*PEMParser pemParserCerts = new PEMParser(new FileReader(certFilePath));
+        /*final PEMParser pemParserCerts = new PEMParser(new FileReader(certFilePath));
         Object object;
         while ((object = pemParserCerts.readObject()) != null) {
             if (object instanceof X509CertificateHolder) {

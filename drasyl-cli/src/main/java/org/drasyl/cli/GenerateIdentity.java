@@ -1,14 +1,11 @@
 package org.drasyl.cli;
 
-import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemWriter;
 import org.drasyl.crypto.Crypto;
 import org.drasyl.crypto.CryptoException;
 import org.drasyl.crypto.sodium.DrasylSodiumWrapper;
-import org.drasyl.identity.DrasylAddress;
 import org.drasyl.identity.Identity;
 import org.drasyl.identity.IdentityPublicKey;
 import org.drasyl.identity.IdentitySecretKey;
@@ -16,10 +13,8 @@ import org.drasyl.identity.KeyAgreementPublicKey;
 import org.drasyl.identity.KeyAgreementSecretKey;
 import org.drasyl.identity.KeyPair;
 import org.drasyl.identity.ProofOfWork;
-import org.drasyl.identity.SecretKey;
 import org.drasyl.node.identity.IdentityManager;
 
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -35,7 +30,6 @@ import java.util.Base64;
 import static java.util.Objects.requireNonNull;
 import static org.drasyl.cli.CreateCSR.LINE_SEPARATOR;
 import static org.drasyl.crypto.Crypto.INSTANCE;
-import static org.drasyl.crypto.sodium.DrasylSodiumWrapper.CURVE25519_SECRETKEYBYTES;
 import static org.drasyl.crypto.sodium.DrasylSodiumWrapper.ED25519_PUBLICKEYBYTES;
 import static org.drasyl.crypto.sodium.DrasylSodiumWrapper.ED25519_SECRETKEYBYTES;
 import static org.drasyl.identity.Identity.POW_DIFFICULTY;
@@ -56,33 +50,33 @@ public class GenerateIdentity {
     public static void main(String[] args) throws Exception {
         Security.addProvider(new BouncyCastleProvider());
 
-        String publicKeyFileName = args[0];
-        String privateKeyFileName = args[1];
-        String identityFilePath = args[2];
+        final String publicKeyFileName = args[0];
+        final String privateKeyFileName = args[1];
+        final String identityFilePath = args[2];
 
         // generate the keys
-        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("Ed25519");
-        java.security.KeyPair keyPairED25519 = keyPairGenerator.generateKeyPair();
-        PublicKey publicKey = keyPairED25519.getPublic();
-        PrivateKey privateKey = keyPairED25519.getPrivate();
+        final KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("Ed25519");
+        final java.security.KeyPair keyPairED25519 = keyPairGenerator.generateKeyPair();
+        final PublicKey publicKey = keyPairED25519.getPublic();
+        final PrivateKey privateKey = keyPairED25519.getPrivate();
 
         // save the keys to files
         writeKeyToFile("PUBLIC KEY", publicKey.getEncoded(), publicKeyFileName + ".pem");
         writeKeyToFile("PRIVATE KEY", privateKey.getEncoded(), privateKeyFileName + ".key");
 
-        String privateKeyPEM = Files.readString(Path.of(privateKeyFileName + ".key"));
+        final String privateKeyPEM = Files.readString(Path.of(privateKeyFileName + ".key"));
         System.out.println(privateKeyPEM);
-        byte[] secretKeyBytes = convertSecretKeyEd25519(privateKeyPEM);
-        byte[] publicKeyBytes = publicKeyFromSecretKey(secretKeyBytes);
+        final byte[] secretKeyBytes = convertSecretKeyEd25519(privateKeyPEM);
+        final byte[] publicKeyBytes = publicKeyFromSecretKey(secretKeyBytes);
 
         System.out.println(new String(publicKeyBytes));
 
-        IdentitySecretKey idSecKey = IdentitySecretKey.of(secretKeyBytes);
-        IdentityPublicKey idPubKey = IdentityPublicKey.of(publicKeyBytes);
-        ProofOfWork pow = ProofOfWork.generateProofOfWork(idPubKey, POW_DIFFICULTY);
-        KeyPair<IdentityPublicKey, IdentitySecretKey> identityKeyPair = KeyPair.of(idPubKey, idSecKey);
-        KeyPair<KeyAgreementPublicKey, KeyAgreementSecretKey> agreementKeyPair = Crypto.INSTANCE.convertLongTimeKeyPairToKeyAgreementKeyPair(identityKeyPair);
-        Identity id = Identity.of(pow,identityKeyPair,agreementKeyPair);
+        final IdentitySecretKey idSecKey = IdentitySecretKey.of(secretKeyBytes);
+        final IdentityPublicKey idPubKey = IdentityPublicKey.of(publicKeyBytes);
+        final ProofOfWork pow = ProofOfWork.generateProofOfWork(idPubKey, POW_DIFFICULTY);
+        final KeyPair<IdentityPublicKey, IdentitySecretKey> identityKeyPair = KeyPair.of(idPubKey, idSecKey);
+        final KeyPair<KeyAgreementPublicKey, KeyAgreementSecretKey> agreementKeyPair = Crypto.INSTANCE.convertLongTimeKeyPairToKeyAgreementKeyPair(identityKeyPair);
+        final Identity id = Identity.of(pow, identityKeyPair, agreementKeyPair);
 
         IdentityManager.writeIdentityFile(Path.of(identityFilePath), id);
     }
@@ -134,8 +128,8 @@ public class GenerateIdentity {
     }
 
     private static void writeKeyToFile(String description, byte[] keyBytes, String filename) throws IOException {
-        PemObject pemObjectPublicKey = new PemObject(description, keyBytes);
-        PemWriter pemWriterPublicKey = new PemWriter(new FileWriter(filename));
+        final PemObject pemObjectPublicKey = new PemObject(description, keyBytes);
+        final PemWriter pemWriterPublicKey = new PemWriter(new FileWriter(filename));
         pemWriterPublicKey.writeObject(pemObjectPublicKey);
         pemWriterPublicKey.close();
     }

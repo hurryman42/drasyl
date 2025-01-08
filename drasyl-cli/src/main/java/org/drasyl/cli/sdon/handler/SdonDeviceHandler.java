@@ -47,11 +47,7 @@ import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
 import java.security.PublicKey;
-import java.security.SignatureException;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
@@ -59,7 +55,6 @@ import java.security.cert.X509Certificate;
 import java.util.Base64;
 import java.util.Date;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -155,68 +150,68 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
 
                 if (!certificates.isEmpty() && !((ControllerHello) msg).policies().isEmpty()) {
                     // load rootCertificate from file & check whether it equals the last certificate in the message
-                    String rootCertFilePath = "cacert.crt";
-                    String rootCertString = Files.readString(Path.of(rootCertFilePath));
+                    final String rootCertFilePath = "cacert.crt";
+                    final String rootCertString = Files.readString(Path.of(rootCertFilePath));
                     if (!(certificates.get(certificates.size()-1).equals(rootCertString))) {
                         throw new CertificateException("Not the right root certificate!");
                     }
 
                     // check validity of the sender's certificates
-                    CertificateFactory cf = CertificateFactory.getInstance("X.509");
-                    for (int i=0; i<certificates.size()-1; i++) {
+                    final CertificateFactory cf = CertificateFactory.getInstance("X.509");
+                    for (int i = 0; i < certificates.size() - 1; i++) {
                         // load current certificate
-                        String certificateString = certificates.get(i);
-                        X509Certificate certificate = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(certificateString.getBytes()));
+                        final String certificateString = certificates.get(i);
+                        final X509Certificate certificate = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(certificateString.getBytes()));
 
                         // load next certificate (one up the chain)
-                        String nextCertString = certificates.get(i+1);
-                        X509Certificate nextCert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(nextCertString.getBytes()));
+                        final String nextCertString = certificates.get(i + 1);
+                        final X509Certificate nextCert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(nextCertString.getBytes()));
 
                         // check expiration dates
                         certificate.checkValidity(new Date());
                         nextCert.checkValidity(new Date());
 
                         // verify current certificate with the public key of the next certificate
-                        PublicKey nextPubKey = nextCert.getPublicKey();
+                        final PublicKey nextPubKey = nextCert.getPublicKey();
                         certificate.verify(nextPubKey);
                     }
 
                     // check subnet address
-                    String certString = certificates.get(0);
-                    X509Certificate cert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(certString.getBytes()));
-                    X500Name subject = new JcaX509CertificateHolder(cert).getSubject();
-                    String subjectString = subject.toString();
-                    String[] subjectInfos = subjectString.split(",");
-                    String subnet = subjectInfos[0].substring(3);
+                    final String certString = certificates.get(0);
+                    final X509Certificate cert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(certString.getBytes()));
+                    final X500Name subject = new JcaX509CertificateHolder(cert).getSubject();
+                    final String subjectString = subject.toString();
+                    final String[] subjectInfos = subjectString.split(",");
+                    final String subnet = subjectInfos[0].substring(3);
                     out.println("Valid X.509 certificate for subnet " + subnet);
-                    String[] subnetSplit = subnet.split("/");
-                    InetAddress subnetAddress = InetAddress.getByName(subnetSplit[0]);
-                    byte[] subnetAddressBytes = subnetAddress.getAddress();
-                    short subnetNetmask = Short.parseShort(subnetSplit[1]);
+                    final String[] subnetSplit = subnet.split("/");
+                    final InetAddress subnetAddress = InetAddress.getByName(subnetSplit[0]);
+                    final byte[] subnetAddressBytes = subnetAddress.getAddress();
+                    final short subnetNetmask = Short.parseShort(subnetSplit[1]);
 
-                    Set<Policy> policies = ((ControllerHello) msg).policies();
+                    final Set<Policy> policies = ((ControllerHello) msg).policies();
                     for (Policy policy : policies) {
                         if (policy instanceof TunPolicy) {
-                            TunPolicy tunPolicy = (TunPolicy) policy;
-                            InetAddress ipAddress = tunPolicy.address();
-                            byte[] ipAddressBytes = ipAddress.getAddress();
+                            final TunPolicy tunPolicy = (TunPolicy) policy;
+                            final InetAddress ipAddress = tunPolicy.address();
+                            final byte[] ipAddressBytes = ipAddress.getAddress();
 
-                            short netmask = tunPolicy.netmask();
+                            final short netmask = tunPolicy.netmask();
 
-                            int numBytesToMask = subnetNetmask / 8;
-                            int remainingBits = subnetNetmask % 8;
+                            final int numBytesToMask = subnetNetmask / 8;
+                            final int remainingBits = subnetNetmask % 8;
 
-                            byte[] mask = new byte[ipAddressBytes.length];
-                            for (int i=0; i<numBytesToMask; i++) {
+                            final byte[] mask = new byte[ipAddressBytes.length];
+                            for (int i = 0; i < numBytesToMask; i++) {
                                 mask[i] = (byte) 0xFF;
                             }
                             if (remainingBits > 0) {
-                                mask[numBytesToMask] = (byte) (0xFF << (8-remainingBits));
+                                mask[numBytesToMask] = (byte) (0xFF << (8 - remainingBits));
                             }
 
-                            byte[] maskedIp = new byte[ipAddressBytes.length];
-                            byte[] maskedSubnet = new byte[subnetAddressBytes.length];
-                            for (int i=0; i<ipAddressBytes.length; i++) {
+                            final byte[] maskedIp = new byte[ipAddressBytes.length];
+                            final byte[] maskedSubnet = new byte[subnetAddressBytes.length];
+                            for (int i = 0; i < ipAddressBytes.length; i++) {
                                 maskedIp[i] = (byte) (ipAddressBytes[i] & mask[i]);
                                 maskedSubnet[i] = (byte) (subnetAddressBytes[i] & mask[i]);
                             }
