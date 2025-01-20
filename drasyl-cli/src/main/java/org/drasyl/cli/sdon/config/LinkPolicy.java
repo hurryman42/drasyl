@@ -58,6 +58,23 @@ public class LinkPolicy extends Policy {
         return peerAddress;
     }
 
+    public void addPolicy(final ChannelPipeline pipeline) {
+        // NOOP
+    }
+
+    @Override
+    public void removePolicy(final ChannelPipeline pipeline) {
+        // NOOP
+    }
+
+    @Override
+    public LuaValue luaValue() {
+        final LuaValue table = super.luaValue();
+        table.set("peer", LuaString.valueOf(peer));
+        table.set("peerAddress", LuaString.valueOf(peerAddress.toString()));
+        return table;
+    }
+
     @Override
     public boolean equals(final Object o) {
         if (this == o) {
@@ -82,22 +99,5 @@ public class LinkPolicy extends Policy {
                 ", peerAddress=" + peerAddress +
                 ", state=" + state +
                 '}';
-    }
-
-    public void addPolicy(final ChannelPipeline pipeline) {
-        // NOOP
-    }
-
-    @Override
-    public void removePolicy(final ChannelPipeline pipeline) {
-        // NOOP
-    }
-
-    @Override
-    public LuaValue luaValue() {
-        final LuaValue table = super.luaValue();
-        table.set("peer", LuaString.valueOf(peer));
-        table.set("peerAddress", LuaString.valueOf(peerAddress.toString()));
-        return table;
     }
 }

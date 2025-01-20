@@ -129,14 +129,13 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                         final List<String> certificates;
                         if (node != null) {
                             policies = node.createPolicies();
-                            certificates = node.loadCertificates("chain.crt");
+                            policies.addAll(device.createPolicies());
+                            certificates = node.loadCertificates("chain.crt"); // TODO: make this more dynamic
                         }
                         else {
                             policies = Set.of();
                             certificates = List.of();
                         }
-
-                        // TODO: create device policies, then make new ControllerMakeSubController() or (rather) integrate into ControllerHello policies
 
                         final ControllerHello controllerHello = new ControllerHello(policies, certificates);
                         LOG.debug("Send {} to {}.", controllerHello.toString().replace("\n", ""), device.address());

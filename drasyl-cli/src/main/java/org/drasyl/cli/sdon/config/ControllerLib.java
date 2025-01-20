@@ -21,7 +21,6 @@
  */
 
 package org.drasyl.cli.sdon.config;
-import org.drasyl.identity.DrasylAddress;
 import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
@@ -90,7 +89,7 @@ public class ControllerLib extends TwoArgFunction {
             final LuaTable devicesTable = devicesArg.checktable();
             final Devices devices = (Devices) devicesTable;
             final Collection<Device> deviceList = devices.getDevices();
-            Device subController = deviceList.iterator().next(); //at first calculate no score, but take the first best
+            final Device subController = deviceList.iterator().next(); //at first calculate no score, but take the first best
             /*int bestScore = 0;
             for (Device device : deviceList) {
                 int currentDeviceScore = device.calculateConnectionScore(); // TODO: write function that calculates good score for the selection of sub-controller
@@ -111,7 +110,7 @@ public class ControllerLib extends TwoArgFunction {
             final Devices devices = (Devices) devicesTable;
             final Collection<Device> deviceList = devices.getDevices();
             final int amount = amountArg.toint();
-            Devices devicesToHandover = new Devices();
+            final Devices devicesToHandover = new Devices();
             for (Device device : deviceList) {
                 devicesToHandover.add(device);
             }

@@ -28,6 +28,7 @@ import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 import org.luaj.vm2.lib.TwoArgFunction;
 
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -101,6 +102,13 @@ public class Device extends LuaTable {
             table.set(index++, policy.luaValue());
         }
         set("policies", table);
+    }
+
+    public Set<Policy> createPolicies() {
+        final Set<Policy> policies = new HashSet<>();
+        final Policy devicePolicy = new DevicePolicy(address(), controllerAddress(), isSubController());
+        policies.add(devicePolicy);
+        return policies;
     }
 
     public void setControllerAddress(final DrasylAddress controllerAddress) {
