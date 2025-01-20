@@ -46,7 +46,6 @@ import java.util.Base64;
 public class CreateCSR {
     public static final String BEGIN_CSR = "-----BEGIN SIGNING REQUEST-----";
     public static final String END_CSR = "-----END SIGNING REQUEST-----";
-    public static final String LINE_SEPARATOR = "\n";
 
     /**
      * given an ed25519 keypair and a subnet address it creates a CSR for that subnet
@@ -115,9 +114,9 @@ public class CreateCSR {
     }
 
     private static String convertCSRToPemString(final PKCS10CertificationRequest csr) throws IOException {
-        final Base64.Encoder encoder = Base64.getMimeEncoder(64, LINE_SEPARATOR.getBytes(StandardCharsets.UTF_8));
+        final Base64.Encoder encoder = Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.UTF_8));
         final byte[] csrBytes = csr.getEncoded();
 
-        return BEGIN_CSR + LINE_SEPARATOR + encoder.encodeToString(csrBytes) + LINE_SEPARATOR + END_CSR;
+        return BEGIN_CSR + "\n" + encoder.encodeToString(csrBytes) + "\n" + END_CSR;
     }
 }

@@ -104,10 +104,12 @@ public class Device extends LuaTable {
         set("policies", table);
     }
 
-    public Set<Policy> createPolicies() {
+    public Set<Policy> createPolicies(String subnet) {
         final Set<Policy> policies = new HashSet<>();
-        final Policy devicePolicy = new DevicePolicy(address(), controllerAddress(), isSubController());
-        policies.add(devicePolicy);
+        if (get("make_sub_controller") == TRUE) {
+            final Policy controllerPolicy = new ControllerPolicy(address(), controllerAddress(), isSubController(), subnet);
+            policies.add(controllerPolicy);
+        }
         return policies;
     }
 
@@ -127,15 +129,10 @@ public class Device extends LuaTable {
         return get("is_sub_controller") == TRUE;
     }
 
-    public boolean isNotSubController() {
-        return get("is_sub_controller") == FALSE;
-    }
-
     static class MakeSubControllerFunction extends TwoArgFunction {
         @Override
         public LuaValue call(final LuaValue subControllerArg, final LuaValue devicesArg) {
-            //TODO: fill
-            // initiate the certificate process for the sub-controller
+            //TODO: initiate the certificate process for the sub-controller
             return NIL;
         }
     }

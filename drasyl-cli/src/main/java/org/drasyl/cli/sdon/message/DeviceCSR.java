@@ -24,48 +24,29 @@ package org.drasyl.cli.sdon.message;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.drasyl.cli.sdon.config.Policy;
-
-import java.util.List;
 import java.util.Objects;
-import java.util.Set;
-
 import static java.util.Objects.requireNonNull;
 
 /**
- * Message sent from the controller to all devices.
+ * Message sent from ongoing sub-controller to its controller.
  */
-public class ControllerHello implements SdonMessage {
-    // policies later as certificate extensions?
-    private final Set<Policy> policies;
-    private final List<String> certificates;
+public class DeviceCSR implements SdonMessage {
+    private final String csr;
 
     @JsonCreator
-    public ControllerHello(@JsonProperty("policies") final Set<Policy> policies,
-                           @JsonProperty("certificates") final List<String> certificates) {
-        this.policies = requireNonNull(policies);
-        this.certificates = requireNonNull(certificates);
-    }
-
-    public ControllerHello() {
-        this(Set.of(), List.of());
+    public DeviceCSR(@JsonProperty final String csr) {
+        this.csr = requireNonNull(csr);
     }
 
     @JsonGetter
-    public Set<Policy> policies() {
-        return policies;
-    }
-
-    @JsonGetter
-    public List<String> certificates() {
-        return certificates;
+    public String csr() {
+        return csr;
     }
 
     @Override
     public String toString() {
-        return "ControllerHello{" +
-                "policies='" + policies + '\'' +
-                "certificates='" + certificates + '\'' +
+        return "DeviceCSR{" +
+                "CSR=" + csr + '\'' +
                 '}';
     }
 
@@ -77,12 +58,12 @@ public class ControllerHello implements SdonMessage {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        final ControllerHello that = (ControllerHello) o;
-        return (Objects.equals(policies, that.policies) && Objects.equals(certificates, that.certificates));
+        final DeviceCSR that = (DeviceCSR) o;
+        return csr.equals(that.csr);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(policies, certificates);
+        return Objects.hashCode(csr);
     }
 }

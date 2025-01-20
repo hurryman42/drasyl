@@ -26,13 +26,25 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.openssl.PEMParser;
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.OperatorCreationException;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
+import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
 import org.drasyl.channel.DrasylServerChannel;
+import org.drasyl.cli.sdon.config.ControllerPolicy;
 import org.drasyl.cli.sdon.config.Policy;
 import org.drasyl.cli.sdon.config.TunPolicy;
 import org.drasyl.cli.sdon.event.SdonMessageReceived;
 import org.drasyl.cli.sdon.message.ControllerHello;
+import org.drasyl.cli.sdon.message.DeviceCSR;
 import org.drasyl.cli.sdon.message.DeviceHello;
 import org.drasyl.cli.sdon.message.SdonMessage;
 import org.drasyl.identity.DrasylAddress;
@@ -41,14 +53,16 @@ import org.drasyl.util.logging.Logger;
 import org.drasyl.util.logging.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.security.cert.CertificateEncodingException;
+import java.security.Security;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -226,6 +240,18 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                                 throw new Exception("The netmask of the IP address from the policy is not the same as netmask from the controller's certificate.");
                             }*/
                         }
+                        else if (policy instanceof ControllerPolicy) {
+                            final ControllerPolicy controllerPolicy = (ControllerPolicy) policy;
+                            final Boolean isSubController = controllerPolicy.is_sub_controller();
+                            String publicKeyFilePath = "device-priv.key"; // maybe more dynamic? or as keyInfo?
+                            String privateKeyFilePath = "device-pub.pem"; // maybe more dynamic? or as keyInfo?
+                            final String subControllerSubnet = controllerPolicy.subnet();
+                            if (!isSubController) { // start SubController creation process
+                                String csrAsString = createCSR(publicKeyFilePath, privateKeyFilePath, subControllerSubnet);
+                                final DeviceCSR subControllerCSR = new DeviceCSR(csrAsString);
+                                // TODO: send the CSR message
+                            }
+                        }
                     }
                 }
                 else if (certificates.isEmpty() && !((ControllerHello) msg).policies().isEmpty()) {
@@ -267,17 +293,46 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
         }
     }
 
-    /**
-     * Converts the given {@code certificate} to a PEM-encoded string representation.
-     *
-     * @param certificate the certificate to encode
-     * @return PEM-encoded certificate as a String
-     * @throws CertificateEncodingException if an encoding error occurs.
-     */
-    public static String convertCertToPem(final X509Certificate certificate) throws CertificateEncodingException, IOException {
+    private String createCSR(String publicKeyFilePath, String privateKeyFilePath, String subnet) throws OperatorCreationException, IOException {
+        Security.addProvider(new BouncyCastleProvider());
+
+        // load keys
+        final PublicKey publicKey = loadPublicKey(publicKeyFilePath);
+        final PrivateKey privateKey = loadPrivateKey(privateKeyFilePath);
+
+        // create only subject info for future certificate
+        final X500Name subjectName = new X500Name("CN=" + subnet);
+
+        // create CSR builder
+        final JcaPKCS10CertificationRequestBuilder csrBuilder = new JcaPKCS10CertificationRequestBuilder(subjectName, publicKey);
+        // create a content signer
+        final ContentSigner signer = new JcaContentSignerBuilder("Ed25519").setProvider("BC").build(privateKey);
+        // build the CSR
+        final PKCS10CertificationRequest csr = csrBuilder.build(signer);
+
+        return convertCSRToPemString(csr);
+    }
+
+    private static PrivateKey loadPrivateKey(String privateKeyFilePath) throws IOException {
+        final PEMParser pemParser = new PEMParser(new FileReader(privateKeyFilePath));
+        final PrivateKeyInfo keyInfo = (PrivateKeyInfo) pemParser.readObject();
+        pemParser.close();
+        final JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
+        return converter.getPrivateKey(keyInfo);
+    }
+
+    private static PublicKey loadPublicKey(String publicKeyFilePath) throws IOException {
+        final PEMParser pemParser = new PEMParser(new FileReader(publicKeyFilePath));
+        final SubjectPublicKeyInfo keyInfo = (SubjectPublicKeyInfo) pemParser.readObject();
+        pemParser.close();
+        final JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
+        return converter.getPublicKey(keyInfo);
+    }
+
+    private static String convertCSRToPemString(final PKCS10CertificationRequest csr) throws IOException {
         final Base64.Encoder encoder = Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.UTF_8));
-        final byte[] cert = certificate.getEncoded();
-        return "-----END CERTIFICATE-----" + "\n" + encoder.encodeToString(cert) + "\n" + "-----END PRIVATE KEY-----";
+        final byte[] csrBytes = csr.getEncoded();
+        return "-----BEGIN SIGNING REQUEST-----" + "\n" + encoder.encodeToString(csrBytes) + "\n" + "-----END SIGNING REQUEST-----";
     }
 
     enum State {

@@ -49,7 +49,6 @@ import java.util.Arrays;
 import java.util.Base64;
 
 import static java.util.Objects.requireNonNull;
-import static org.drasyl.cli.CreateCSR.LINE_SEPARATOR;
 import static org.drasyl.crypto.Crypto.INSTANCE;
 import static org.drasyl.crypto.sodium.DrasylSodiumWrapper.ED25519_PUBLICKEYBYTES;
 import static org.drasyl.crypto.sodium.DrasylSodiumWrapper.ED25519_SECRETKEYBYTES;
@@ -111,7 +110,7 @@ public class GenerateIdentity {
         final Base64.Decoder decoder = Base64.getMimeDecoder();
         final String cert = secretKey.replace(BEGIN_KEY, "")
                 .replace(END_KEY, "")
-                .replace(LINE_SEPARATOR, "")
+                .replace("\n", "")
                 .trim();
 
         final byte[] seed = extractRawKey(decoder.decode(cert));

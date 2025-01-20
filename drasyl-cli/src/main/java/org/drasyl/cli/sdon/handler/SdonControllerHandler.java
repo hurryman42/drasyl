@@ -33,15 +33,20 @@ import org.drasyl.cli.sdon.config.NetworkNode;
 import org.drasyl.cli.sdon.config.Policy;
 import org.drasyl.cli.sdon.event.SdonMessageReceived;
 import org.drasyl.cli.sdon.message.ControllerHello;
+import org.drasyl.cli.sdon.message.DeviceCSR;
 import org.drasyl.cli.sdon.message.DeviceHello;
 import org.drasyl.cli.sdon.message.SdonMessage;
 import org.drasyl.identity.DrasylAddress;
 import org.drasyl.util.logging.Logger;
 import org.drasyl.util.logging.LoggerFactory;
 import org.luaj.vm2.LuaString;
+import org.luaj.vm2.ast.Str;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -129,8 +134,27 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                         final List<String> certificates;
                         if (node != null) {
                             policies = node.createPolicies();
-                            policies.addAll(device.createPolicies());
-                            certificates = node.loadCertificates("chain.crt"); // TODO: make this more dynamic
+                            certificates = node.loadCertificates("chain.crt");
+
+                            final String myCertString = certificates.getLast();
+                            final CertificateFactory cf = CertificateFactory.getInstance("X.509");
+                            final X509Certificate myCert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(myCertString.getBytes()));
+
+                            final String myCertSubjectString = myCert.getSubjectX500Principal().toString(); // TODO: test this!!!
+                            int startIndex = myCertSubjectString.indexOf("CN=");
+                            if (startIndex != -1) {
+                                startIndex += 3;
+                                int endIndex = myCertSubjectString.indexOf(",", startIndex);
+                                if (endIndex == -1) {
+                                    endIndex = myCertSubjectString.length();
+                                }
+                                final String subnetAddress = myCertSubjectString.substring(startIndex, endIndex).trim();
+                                // TODO: make a smaller subnet out of the address
+                                policies.addAll(device.createPolicies(subnetAddress));
+                            }
+                            else {
+                                throw new IOException("Error reading the subnet out of the certificate!");
+                            }
                         }
                         else {
                             policies = Set.of();
@@ -186,6 +210,10 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                     LOG.debug("Send {} to {}.", controllerHello, sender);
                     channel.writeAndFlush(controllerHello).addListener(FIRE_EXCEPTION_ON_FAILURE);
                 }
+            }
+            else if (msg instanceof DeviceCSR) {
+                final DeviceCSR deviceCSR = (DeviceCSR) msg;
+                // TODO: sign the CSR & send the certificate back
             }
         }
         else {
