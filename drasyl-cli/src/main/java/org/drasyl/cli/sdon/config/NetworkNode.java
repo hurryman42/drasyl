@@ -123,7 +123,7 @@ public class NetworkNode extends LuaTable {
             final String ipString = get("ip").tojstring();
             final String[] parts = ipString.split("/", 2);
             final InetAddress ipAddress = InetAddress.getByName(parts[0]);
-            final short ipNetmask = Short.valueOf(parts[1]);
+            final short ipNetmask = Short.parseShort(parts[1]);
             final Map<InetAddress, DrasylAddress> mapping = new HashMap<>();
             for (final NetworkLink link : links) {
                 final LuaString peerName = link.other(get("name").checkstring());
@@ -145,6 +145,13 @@ public class NetworkNode extends LuaTable {
         }
     }
 
+    /**
+     * Reads the certificate file, splits the certificate chain in it into the single certificates and returns them as a list.
+     *
+     * @param certFilePath the file path of the certificate(chain) to read
+     * @return String-List of the extracted certificates
+     * @throws IOException if an IO error occurs.
+     */
     public List<String> loadCertificates(String certFilePath) throws IOException {
         final List<String> certificates = new ArrayList<>();
         final String certsString = Files.readString(Path.of(certFilePath));
@@ -156,6 +163,7 @@ public class NetworkNode extends LuaTable {
             }
             certificates.add(cert);
         }
+        return certificates;
         /*final PEMParser pemParserCerts = new PEMParser(new FileReader(certFilePath));
         Object object;
         while ((object = pemParserCerts.readObject()) != null) {
@@ -165,7 +173,6 @@ public class NetworkNode extends LuaTable {
                 certificates.add(certificateString);
             }
         }*/
-        return certificates;
     }
 
     /**

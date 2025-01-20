@@ -54,7 +54,7 @@ public class SdonControllerCommand extends ChannelOptions {
             names = {"-c", "--config"},
             description = "Loads the node configuration from specified file.",
             paramLabel = "<file>",
-            defaultValue = "network.conf"
+            defaultValue = "network-conf.lua"
     )
     private File configFile;
     private NetworkConfig config;

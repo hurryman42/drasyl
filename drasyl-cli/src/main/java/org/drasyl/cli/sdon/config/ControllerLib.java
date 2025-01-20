@@ -21,11 +21,14 @@
  */
 
 package org.drasyl.cli.sdon.config;
+import org.drasyl.identity.DrasylAddress;
 import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 import org.luaj.vm2.lib.OneArgFunction;
 import org.luaj.vm2.lib.TwoArgFunction;
+
+import java.util.Collection;
 
 /**
  * Lua API provided by the controller.
@@ -39,6 +42,9 @@ public class ControllerLib extends TwoArgFunction {
         env.set("create_network", new CreateNetworkFunction());
         env.set("register_network", new RegisterNetworkFunction());
         env.set("inspect", new InspectFunction());
+        env.set("get_network", new GetNetworkFunction());
+        env.set("elect_sub_controller", new ElectSubControllerFunction());
+        env.set("elect_devices_to_handover", new ElectDevicesToHandoverFunction());
         return library;
     }
 
@@ -68,6 +74,48 @@ public class ControllerLib extends TwoArgFunction {
         @Override
         public LuaValue call(final LuaValue arg) {
             return LuaValue.valueOf(arg.toString());
+        }
+    }
+
+    static class GetNetworkFunction extends OneArgFunction {
+        @Override
+        public LuaTable call(final LuaValue deviceArg) {
+            return new LuaTable();
+        }
+    }
+
+    static class ElectSubControllerFunction extends OneArgFunction {
+        @Override
+        public LuaValue call(final LuaValue devicesArg) {
+            final LuaTable devicesTable = devicesArg.checktable();
+            final Devices devices = (Devices) devicesTable;
+            final Collection<Device> deviceList = devices.getDevices();
+            Device subController = deviceList.iterator().next(); //at first calculate no score, but take the first best
+            /*int bestScore = 0;
+            for (Device device : deviceList) {
+                int currentDeviceScore = device.calculateConnectionScore(); // TODO: write function that calculates good score for the selection of sub-controller
+                if (currentDeviceScore >= bestScore) {
+                    bestScore = currentDeviceScore;
+                    subController = device;
+                }
+            }*/
+            return LuaValue.valueOf(subController.toString());
+        }
+    }
+
+    static class ElectDevicesToHandoverFunction extends TwoArgFunction {
+        @Override
+        public LuaValue call(final LuaValue devicesArg, final LuaValue amountArg) {
+            // just take the first best devices
+            final LuaTable devicesTable = devicesArg.checktable();
+            final Devices devices = (Devices) devicesTable;
+            final Collection<Device> deviceList = devices.getDevices();
+            final int amount = amountArg.toint();
+            Devices devicesToHandover = new Devices();
+            for (Device device : deviceList) {
+                devicesToHandover.add(device);
+            }
+            return devicesToHandover;
         }
     }
 }

@@ -72,12 +72,15 @@ public class Network extends LuaTable {
         set("remove_node", new RemoveNodeFunction());
         set("clear_nodes", new ClearNodesFunction());
 
-        // link
+        // links
         set("get_links", new GetLinksFunction());
         set("get_link", new GetLinkFunction());
         set("add_link", new AddLinkFunction());
         set("remove_link", new RemoveLinkFunction());
         set("clear_links", new ClearLinksFunction());
+
+        // devices
+        set("get_devices", new GetDevicesFunction());
 
         // network
         set("set_callback", new SetCallbackFunction());
@@ -240,32 +243,32 @@ public class Network extends LuaTable {
     }
 
     public boolean notifyListener(final ChannelHandlerContext ctx) throws IOException {
-//        if (networkListener != null) {
-//            final int before = hashCode();
-//            networkListener.call(this);
-//            final int after = hashCode();
-//            final boolean networkChanged = before != after;
-//
-//            if (networkChanged) {
-//                LOG.trace("Network has changed. Push new policies to all online nodes.");
-//
-//                // push new config to all nodes
-//                final Map<DrasylAddress, DrasylChannel> channels = ((DrasylServerChannel) ctx.channel()).getChannels();
-//                for (final NodeTable node : nodes.values()) {
-//                    final DrasylChannel channel = channels.get(node.name());
-//                    if (node.state().isOnline()) {
-//                        final Set<Policy> policies = node.policies();
-//
-//                        final ControllerHello controllerHello = new ControllerHello(policies);
-//                        LOG.error("Send {} to {}.", controllerHello, node.name());
-//                        channel.writeAndFlush(controllerHello).addListener(FIRE_EXCEPTION_ON_FAILURE);
-//                    }
-//                }
-//            }
-//
-//            return networkChanged;
-//        }
+          /*
+          if (networkListener != null) {
+              final int before = hashCode();
+              networkListener.call(this);
+              final int after = hashCode();
+              final boolean networkChanged = before != after;
 
+              if (networkChanged) {
+                  LOG.trace("Network has changed. Push new policies to all online nodes.");
+
+                  // push new config to all nodes
+                  final Map<DrasylAddress, DrasylChannel> channels = ((DrasylServerChannel) ctx.channel()).getChannels();
+                  for (final NodeTable node : nodes.values()) {
+                      final DrasylChannel channel = channels.get(node.name());
+                      if (node.state().isOnline()) {
+                          final Set<Policy> policies = node.policies();
+
+                          final ControllerHello controllerHello = new ControllerHello(policies);
+                          LOG.error("Send {} to {}.", controllerHello, node.name());
+                          channel.writeAndFlush(controllerHello).addListener(FIRE_EXCEPTION_ON_FAILURE);
+                      }
+                  }
+              }
+
+              return networkChanged;
+          }*/
         return false;
     }
 
@@ -443,6 +446,16 @@ public class Network extends LuaTable {
             network.setCallback(callbackFunction);
 
             return NIL;
+        }
+    }
+
+    // Devices
+    static class GetDevicesFunction extends OneArgFunction { // currently unnecessary, but should work
+        @Override
+        public LuaTable call(final LuaValue networkArg) {
+            final Network network = (Network) networkArg.checktable();
+
+            return network.getDevicesTable();
         }
     }
 }

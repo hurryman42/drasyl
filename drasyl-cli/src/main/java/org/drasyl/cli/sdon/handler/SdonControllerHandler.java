@@ -136,6 +136,8 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                             certificates = List.of();
                         }
 
+                        // TODO: create device policies, then make new ControllerMakeSubController() or (rather) integrate into ControllerHello policies
+
                         final ControllerHello controllerHello = new ControllerHello(policies, certificates);
                         LOG.debug("Send {} to {}.", controllerHello.toString().replace("\n", ""), device.address());
                         final DrasylChannel channel = ((DrasylServerChannel) ctx.channel()).getChannels().get(device.address());

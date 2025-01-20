@@ -26,19 +26,32 @@ import org.drasyl.identity.DrasylAddress;
 import org.drasyl.identity.IdentityPublicKey;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
+import org.luaj.vm2.lib.TwoArgFunction;
 
 import java.util.Map;
 import java.util.Set;
 
 /**
- * Represents a device.
+ * Represents a device (a node or a sub-controller).
  */
 public class Device extends LuaTable {
+    Device(final DrasylAddress address, final DrasylAddress controllerAddress) {
+        set("address", LuaValue.valueOf(address.toString()));
+        set("online", FALSE);
+        set("facts", tableOf());
+        set("policies", tableOf());
+        set("is_sub_controller", FALSE);
+        set("controller_address", LuaValue.valueOf(controllerAddress.toString()));
+    }
+
     Device(final DrasylAddress address) {
         set("address", LuaValue.valueOf(address.toString()));
         set("online", FALSE);
         set("facts", tableOf());
         set("policies", tableOf());
+        set("is_sub_controller", FALSE);
+        set("controller_address", LuaValue.valueOf(""));
+        set("make_sub_controller", new MakeSubControllerFunction());
     }
 
     @Override
@@ -48,6 +61,8 @@ public class Device extends LuaTable {
         stringTable.set("online", get("online"));
         stringTable.set("facts", get("facts"));
         stringTable.set("policies", get("policies"));
+        stringTable.set("is_sub_controller", get("is_sub_controller"));
+        stringTable.set("controllerAddress", get("controllerAddress"));
         return "Device" + LuaHelper.toString(stringTable);
     }
 
@@ -71,6 +86,10 @@ public class Device extends LuaTable {
         return IdentityPublicKey.of(get("address").tojstring());
     }
 
+    public DrasylAddress controllerAddress() {
+        return IdentityPublicKey.of(get("controllerAddress").tojstring());
+    }
+
     public void setFacts(final Map<String, Object> facts) {
         set("facts", LuaHelper.createTable(facts));
     }
@@ -82,5 +101,34 @@ public class Device extends LuaTable {
             table.set(index++, policy.luaValue());
         }
         set("policies", table);
+    }
+
+    public void setControllerAddress(final DrasylAddress controllerAddress) {
+        set("controllerAddress", controllerAddress.toString());
+    }
+
+    public void setSubController() {
+        set("is_sub_controller", TRUE);
+    }
+
+    public void setNotSubController() {
+        set("is_sub_controller", FALSE);
+    }
+
+    public boolean isSubController() {
+        return get("is_sub_controller") == TRUE;
+    }
+
+    public boolean isNotSubController() {
+        return get("is_sub_controller") == FALSE;
+    }
+
+    static class MakeSubControllerFunction extends TwoArgFunction {
+        @Override
+        public LuaValue call(final LuaValue subControllerArg, final LuaValue devicesArg) {
+            //TODO: fill
+            // initiate the certificate process for the sub-controller
+            return NIL;
+        }
     }
 }

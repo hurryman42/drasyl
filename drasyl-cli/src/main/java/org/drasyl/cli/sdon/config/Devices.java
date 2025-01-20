@@ -41,7 +41,7 @@ public class Devices extends LuaTable {
     }
 
     public Device getOrCreateDevice(final DrasylAddress address) {
-        return devices.computeIfAbsent(address, k -> new Device(k));
+        return devices.computeIfAbsent(address, Device::new);
     }
 
     public Collection<Device> getDevices() {
