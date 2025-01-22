@@ -292,6 +292,12 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                 final X509Certificate certificate = new JcaX509CertificateConverter().getCertificate(certBuilder.build(signer));
 
                 // TODO: send the certificate back (as a certificate in the ControllerHello (somehow tell the Device that there is an special extra certificate in this message))
+                final DrasylChannel channel = ((DrasylServerChannel) ctx.channel()).getChannels().get(sender);
+
+                final SdonMessage response = null; // specify actual response
+
+                LOG.debug("Send {} to {}.", response, sender);
+                channel.writeAndFlush(response).addListener(FIRE_EXCEPTION_ON_FAILURE);
             }
         }
         else {
