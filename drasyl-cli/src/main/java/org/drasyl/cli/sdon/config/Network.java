@@ -23,8 +23,8 @@ package org.drasyl.cli.sdon.config;
 
 import io.netty.channel.ChannelHandlerContext;
 import org.drasyl.cli.util.LuaHelper;
-import org.drasyl.identity.DrasylAddress;
 import org.drasyl.util.HashSetMultimap;
+import org.drasyl.util.Preconditions;
 import org.drasyl.util.SetMultimap;
 import org.drasyl.util.network.Subnet;
 import org.luaj.vm2.LuaBoolean;
@@ -41,7 +41,6 @@ import org.luaj.vm2.lib.TwoArgFunction;
 
 import java.io.IOException;
 import java.net.UnknownHostException;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -49,16 +48,31 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import static java.util.Objects.requireNonNull;
+
 @SuppressWarnings("java:S110")
 public class Network extends LuaTable {
-    private final Map<LuaString, NetworkNode> nodes = new HashMap<>();
-    private final Set<NetworkLink> links = new HashSet<>();
-    private final SetMultimap<LuaString, NetworkLink> nodeLinks = new HashSetMultimap<>();
-    private final Devices devices = new Devices();
+    private final Map<LuaString, NetworkNode> nodes;
+    private final Set<NetworkLink> links;
+    private final SetMultimap<LuaString, NetworkLink> nodeLinks;
     private int nextIpIndex;
-    private LuaFunction callback;
+    LuaFunction callback;
+
+    Network(final Map<LuaString, NetworkNode> nodes,
+            final Set<NetworkLink> links,
+            final SetMultimap<LuaString, NetworkLink> nodeLinks,
+            final int nextIpIndex,
+            final LuaFunction callback) {
+        this.nodes = requireNonNull(nodes);
+        this.links = requireNonNull(links);
+        this.nodeLinks = requireNonNull(nodeLinks);
+        this.nextIpIndex = Preconditions.requireNonNegative(nextIpIndex);
+        this.callback = callback;
+    }
 
     public Network(final LuaTable params) {
+        this(new HashMap<>(), new HashSet<>(), new HashSetMultimap<>(), 0, null);
+
         LuaValue subnet = params.get("subnet");
         if (subnet == NIL) {
             subnet = LuaValue.valueOf("10.0.0.0/8");
@@ -213,7 +227,7 @@ public class Network extends LuaTable {
         return (LuaNil) NIL;
     }
 
-    private LuaNil setCallback(final LuaFunction callback) {
+    LuaNil setCallback(final LuaFunction callback) {
         this.callback = callback;
 
         return (LuaNil) NIL;
@@ -279,22 +293,10 @@ public class Network extends LuaTable {
         }
     }
 
-    public void callCallback() {
+    public void callCallback(final Devices devices) {
         if (callback != null) {
-            callback.call(this, getDevicesTable());
+            callback.call(this, devices);
         }
-    }
-
-    public Collection<Device> getDevices() {
-        return devices.getDevices();
-    }
-
-    private Devices getDevicesTable() {
-        return devices;
-    }
-
-    public Device getOrCreateDevice(final DrasylAddress address) {
-        return devices.getOrCreateDevice(address);
     }
 
     /*

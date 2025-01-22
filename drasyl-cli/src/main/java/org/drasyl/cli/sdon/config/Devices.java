@@ -30,21 +30,21 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class Devices extends LuaTable {
-    private final Map<DrasylAddress, Device> devices = new HashMap<>();
+    private final Map<DrasylAddress, Device> devicesMap = new HashMap<>();
 
-    Devices() {
+    public Devices() {
     }
 
     @Override
     public String toString() {
-        return "Devices" + LuaHelper.toString(LuaHelper.createTable(devices.values()));
+        return "Devices" + LuaHelper.toString(LuaHelper.createTable(devicesMap.values()));
     }
 
     public Device getOrCreateDevice(final DrasylAddress address) {
-        return devices.computeIfAbsent(address, k -> new Device(k));
+        return devicesMap.computeIfAbsent(address, Device::new);
     }
 
-    public Collection<Device> getDevices() {
-        return devices.values();
+    public Collection<Device> getDevicesCollection() {
+        return devicesMap.values();
     }
 }

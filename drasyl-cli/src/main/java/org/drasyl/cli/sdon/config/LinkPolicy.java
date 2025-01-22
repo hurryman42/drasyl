@@ -36,7 +36,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * Policy for a link to another device.
  */
-public class LinkPolicy extends Policy {
+public class LinkPolicy extends AbstractPolicy {
     private final String peer;
     private final DrasylAddress peerAddress;
 

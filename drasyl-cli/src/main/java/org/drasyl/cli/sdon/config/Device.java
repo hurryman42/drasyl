@@ -83,4 +83,8 @@ public class Device extends LuaTable {
         }
         set("policies", table);
     }
+
+    public Set<Policy> createPolicies() {
+        return Set.of();
+    }
 }

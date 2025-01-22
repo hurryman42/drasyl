@@ -25,7 +25,7 @@ import io.netty.channel.ChannelPipeline;
 import org.drasyl.channel.DrasylServerChannel;
 import org.drasyl.cli.channel.AbstractChannelInitializer;
 import org.drasyl.cli.handler.PrintAndExitOnExceptionHandler;
-import org.drasyl.cli.sdon.config.NetworkConfig;
+import org.drasyl.cli.sdon.config.Network;
 import org.drasyl.cli.sdon.handler.SdonControllerHandler;
 import org.drasyl.util.Worm;
 import org.drasyl.util.logging.Logger;
@@ -41,19 +41,19 @@ public class SdonControllerChannelInitializer extends AbstractChannelInitializer
     private final PrintStream out;
     private final PrintStream err;
     private final Worm<Integer> exitCode;
-    private final NetworkConfig config;
+    private final Network network;
 
     @SuppressWarnings("java:S107")
     public SdonControllerChannelInitializer(final long onlineTimeoutMillis,
                                             final PrintStream out,
                                             final PrintStream err,
                                             final Worm<Integer> exitCode,
-                                            final NetworkConfig config) {
+                                            final Network network) {
         super(onlineTimeoutMillis);
         this.out = requireNonNull(out);
         this.err = requireNonNull(err);
         this.exitCode = requireNonNull(exitCode);
-        this.config = requireNonNull(config);
+        this.network = requireNonNull(network);
     }
 
     @Override
@@ -61,7 +61,7 @@ public class SdonControllerChannelInitializer extends AbstractChannelInitializer
         super.initChannel(ch);
 
         final ChannelPipeline p = ch.pipeline();
-        p.addLast(new SdonControllerHandler(out, config));
+        p.addLast(new SdonControllerHandler(out, network));
         p.addLast(new PrintAndExitOnExceptionHandler(err, exitCode));
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2024 Heiko Bornholdt and Kevin Röbert
+ * Copyright (c) 2020-2025 Heiko Bornholdt and Kevin Röbert
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,67 +22,19 @@
 package org.drasyl.cli.sdon.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonSubTypes;
-import com.fasterxml.jackson.annotation.JsonSubTypes.Type;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import io.netty.channel.ChannelPipeline;
-import io.netty.util.internal.StringUtil;
-import org.drasyl.util.logging.Logger;
-import org.drasyl.util.logging.LoggerFactory;
-import org.luaj.vm2.LuaString;
-import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 
-import static org.drasyl.cli.sdon.config.Policy.PolicyState.FAILED;
-import static org.drasyl.cli.sdon.config.Policy.PolicyState.PRESENT;
-import static org.luaj.vm2.LuaValue.NIL;
-import static org.luaj.vm2.LuaValue.tableOf;
-
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME)
-@JsonSubTypes({
-        @Type(TunPolicy.class),
-        @Type(LinkPolicy.class),
-})
-public abstract class Policy {
-    private static final Logger LOG = LoggerFactory.getLogger(Policy.class);
-    public PolicyState state;
-
-    protected Policy(final PolicyState state) {
-        this.state = state;
-    }
-
-    protected Policy() {
-        this(null);
-    }
+public interface Policy {
+    @JsonIgnore
+    void setPresent();
 
     @JsonIgnore
-    public void setPresent() {
-        if (state != null) {
-            throw new IllegalStateException("Policy state is already set.");
-        }
-        this.state = PRESENT;
-    }
+    void setFailed();
 
-    @JsonIgnore
-    public void setFailed() {
-        if (state != null) {
-            throw new IllegalStateException("Policy state is already set.");
-        }
-        this.state = FAILED;
-    }
+    void addPolicy(ChannelPipeline pipeline);
 
-    public abstract void addPolicy(final ChannelPipeline pipeline);
+    void removePolicy(ChannelPipeline pipeline);
 
-    public abstract void removePolicy(final ChannelPipeline pipeline);
-
-    public LuaValue luaValue() {
-        final LuaTable table = tableOf();
-        table.set("type", StringUtil.simpleClassName(this));
-        table.set("state", state != null ? LuaString.valueOf(state.toString()) : NIL);
-        return table;
-    }
-
-    public enum PolicyState {
-        PRESENT, FAILED
-    }
+    LuaValue luaValue();
 }

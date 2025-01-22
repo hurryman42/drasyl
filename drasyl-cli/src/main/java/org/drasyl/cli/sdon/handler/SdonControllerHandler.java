@@ -27,8 +27,8 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.drasyl.channel.DrasylChannel;
 import org.drasyl.channel.DrasylServerChannel;
 import org.drasyl.cli.sdon.config.Device;
+import org.drasyl.cli.sdon.config.Devices;
 import org.drasyl.cli.sdon.config.Network;
-import org.drasyl.cli.sdon.config.NetworkConfig;
 import org.drasyl.cli.sdon.config.NetworkNode;
 import org.drasyl.cli.sdon.config.Policy;
 import org.drasyl.cli.sdon.event.SdonMessageReceived;
@@ -56,12 +56,18 @@ import static org.drasyl.cli.sdon.handler.SdonControllerHandler.State.INITIALIZE
 public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
     private static final Logger LOG = LoggerFactory.getLogger(SdonControllerHandler.class);
     private final PrintStream out;
-    private final NetworkConfig config;
+    private final Network network;
+    private final Devices devices;
     private State state;
 
-    public SdonControllerHandler(final PrintStream out, final NetworkConfig config) {
+    SdonControllerHandler(final PrintStream out, final Network network, final Devices devices) {
         this.out = requireNonNull(out);
-        this.config = requireNonNull(config);
+        this.network = requireNonNull(network);
+        this.devices = requireNonNull(devices);
+    }
+
+    public SdonControllerHandler(final PrintStream out, final Network network) {
+        this(out, network, new Devices());
     }
 
     @Override
@@ -87,10 +93,8 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
 
             ctx.executor().scheduleAtFixedRate(() -> {
                 try {
-                    final Network network = config.network();
-
                     // call callback
-                    network.callCallback();
+                    network.callCallback(devices);
 
                     // do matchmaking
                     final Set<Device> assignedDevices = new HashSet<>();
@@ -100,7 +104,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
 
                         Device bestMatch = null;
                         int minDistance = Integer.MAX_VALUE;
-                        for (final Device device : network.getDevices()) {
+                        for (final Device device : devices.getDevicesCollection()) {
                             if (!assignedDevices.contains(device)) {
                                 final int distance = node.getDistance(device);
                                 if (distance < minDistance) {
@@ -117,19 +121,18 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                     }
 
                     // disseminate policies
-                    for (final Device device : network.getDevices()) {
-                        NetworkNode node = null;
+                    for (final Device device : devices.getDevicesCollection()) {
+                        final Set<Policy> policies = new HashSet<>();
+
+                        // device policies
+                        policies.addAll(device.createPolicies());
+
+                        // node(s) policies
                         for (final Entry<LuaString, NetworkNode> entry : nodes.entrySet()) {
                             if (Objects.equals(entry.getValue().device(), device.address())) {
-                                node = entry.getValue();
+                                final NetworkNode node = entry.getValue();
+                                policies.addAll(node.createPolicies());
                             }
-                        }
-                        final Set<Policy> policies;
-                        if (node != null) {
-                            policies = node.createPolicies();
-                        }
-                        else {
-                            policies = Set.of();
                         }
 
                         final ControllerHello controllerHello = new ControllerHello(policies);
@@ -162,8 +165,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                 final DeviceHello deviceHello = (DeviceHello) msg;
 
                 // add devices
-                final Network network = config.network();
-                final Device device = network.getOrCreateDevice(sender);
+                final Device device = devices.getOrCreateDevice(sender);
                 device.setFacts(deviceHello.facts());
                 device.setPolicies(deviceHello.policies());
 
