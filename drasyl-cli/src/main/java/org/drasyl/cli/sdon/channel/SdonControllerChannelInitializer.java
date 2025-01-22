@@ -32,6 +32,7 @@ import org.drasyl.util.logging.Logger;
 import org.drasyl.util.logging.LoggerFactory;
 
 import java.io.PrintStream;
+import java.security.PrivateKey;
 
 import static java.util.Objects.requireNonNull;
 
@@ -42,18 +43,24 @@ public class SdonControllerChannelInitializer extends AbstractChannelInitializer
     private final PrintStream err;
     private final Worm<Integer> exitCode;
     private final NetworkConfig config;
+    private java.security.PublicKey publicKey;
+    private PrivateKey privateKey;
 
     @SuppressWarnings("java:S107")
     public SdonControllerChannelInitializer(final long onlineTimeoutMillis,
                                             final PrintStream out,
                                             final PrintStream err,
                                             final Worm<Integer> exitCode,
-                                            final NetworkConfig config) {
+                                            final NetworkConfig config,
+                                            final java.security.PublicKey publicKey,
+                                            final PrivateKey privateKey) {
         super(onlineTimeoutMillis);
         this.out = requireNonNull(out);
         this.err = requireNonNull(err);
         this.exitCode = requireNonNull(exitCode);
         this.config = requireNonNull(config);
+        this.publicKey = requireNonNull(publicKey);
+        this.privateKey = requireNonNull(privateKey);
     }
 
     @Override
@@ -61,7 +68,7 @@ public class SdonControllerChannelInitializer extends AbstractChannelInitializer
         super.initChannel(ch);
 
         final ChannelPipeline p = ch.pipeline();
-        p.addLast(new SdonControllerHandler(out, config));
+        p.addLast(new SdonControllerHandler(out, config, publicKey, privateKey));
         p.addLast(new PrintAndExitOnExceptionHandler(err, exitCode));
     }
 }

@@ -25,6 +25,11 @@ import ch.qos.logback.classic.Level;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.DatagramChannel;
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.openssl.PEMException;
+import org.bouncycastle.openssl.PEMParser;
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.drasyl.channel.DrasylServerChannel;
 import org.drasyl.cli.ChannelOptions;
 import org.drasyl.cli.ChannelOptionsDefaultProvider;
@@ -41,8 +46,12 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
+import java.security.PrivateKey;
 import java.util.Map;
 
 import static java.util.Objects.requireNonNull;
@@ -62,10 +71,27 @@ public class SdonDeviceCommand extends ChannelOptions {
     )
     private IdentityPublicKey controller;
     @Option(
+            names = {"--pub-key"},
+            description = "Loads the controllers public key from specified file.",
+            paramLabel = "<file>",
+            defaultValue = "controller-pub.pem"
+    )
+    private File pubKeyFile;
+    @Option(
+            names = {"--priv-key"},
+            description = "Loads the controllers private key from specified file.",
+            paramLabel = "<file>",
+            defaultValue = "controller-priv.key"
+    )
+    private File privKeyFile;
+    @Option(
             names = {"--tag"},
             description = "Associate device with given tags, used by controller to assign specific tasks."
     )
     private String[] tags = new String[0];
+
+    private java.security.PublicKey publicKey;
+    private PrivateKey privateKey;
 
     public SdonDeviceCommand(final PrintStream out,
                              final PrintStream err,
@@ -76,10 +102,31 @@ public class SdonDeviceCommand extends ChannelOptions {
                              final int networkId,
                              final Map<IdentityPublicKey, InetSocketAddress> superPeers,
                              final IdentityPublicKey controller,
+                             final File pubKeyFile,
+                             final File privKeyFile,
                              final String[] tags) {
         super(out, err, logLevel, identityFile, bindAddress, onlineTimeoutMillis, networkId, superPeers);
         this.controller = requireNonNull(controller);
+        this.pubKeyFile = requireNonNull(pubKeyFile);
+        this.privKeyFile = requireNonNull(privKeyFile);
         this.tags = requireNonNull(tags);
+
+        try {
+            final JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
+
+            final PEMParser pemParserPublicKey = new PEMParser(new FileReader(this.pubKeyFile));
+            final SubjectPublicKeyInfo publicKeyInfo = (SubjectPublicKeyInfo) pemParserPublicKey.readObject();
+            pemParserPublicKey.close();
+            publicKey = converter.getPublicKey(publicKeyInfo);
+
+            final PEMParser pemParserPrivateKey = new PEMParser(new FileReader(this.privKeyFile));
+            final PrivateKeyInfo privateKeyInfo = (PrivateKeyInfo) pemParserPrivateKey.readObject();
+            pemParserPrivateKey.close();
+            privateKey = converter.getPrivateKey(privateKeyInfo);
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @SuppressWarnings("unused")
@@ -88,7 +135,7 @@ public class SdonDeviceCommand extends ChannelOptions {
 
     @Override
     protected ChannelHandler getServerChannelInitializer(final Worm<Integer> exitCode) {
-        return new SdonDeviceChannelInitializer(onlineTimeoutMillis, out, err, exitCode, controller, tags);
+        return new SdonDeviceChannelInitializer(onlineTimeoutMillis, out, err, exitCode, controller, publicKey, privateKey, tags);
     }
 
     @Override

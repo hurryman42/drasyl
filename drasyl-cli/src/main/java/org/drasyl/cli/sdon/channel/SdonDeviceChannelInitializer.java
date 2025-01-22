@@ -30,6 +30,7 @@ import org.drasyl.identity.IdentityPublicKey;
 import org.drasyl.util.Worm;
 
 import java.io.PrintStream;
+import java.security.PrivateKey;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -41,6 +42,8 @@ public class SdonDeviceChannelInitializer extends AbstractChannelInitializer {
     private final PrintStream err;
     private final Worm<Integer> exitCode;
     private final IdentityPublicKey controller;
+    private final java.security.PublicKey publicKey;
+    private final PrivateKey privateKey;
     private final String[] tags;
 
     @SuppressWarnings("java:S107")
@@ -49,12 +52,16 @@ public class SdonDeviceChannelInitializer extends AbstractChannelInitializer {
                                         final PrintStream err,
                                         final Worm<Integer> exitCode,
                                         final IdentityPublicKey controller,
+                                        final java.security.PublicKey publicKey,
+                                        final PrivateKey privateKey,
                                         final String[] tags) {
         super(onlineTimeoutMillis);
         this.out = requireNonNull(out);
         this.err = requireNonNull(err);
         this.exitCode = requireNonNull(exitCode);
         this.controller = requireNonNull(controller);
+        this.publicKey = requireNonNull(publicKey);
+        this.privateKey = requireNonNull(privateKey);
         this.tags = requireNonNull(tags);
     }
 
@@ -65,7 +72,7 @@ public class SdonDeviceChannelInitializer extends AbstractChannelInitializer {
         final Map<String, Object> facts = gatherFacts();
 
         final ChannelPipeline p = ch.pipeline();
-        p.addLast(new SdonDeviceHandler(out, controller, facts));
+        p.addLast(new SdonDeviceHandler(out, controller, publicKey, privateKey, facts));
         p.addLast(new PrintAndExitOnExceptionHandler(err, exitCode));
     }
 

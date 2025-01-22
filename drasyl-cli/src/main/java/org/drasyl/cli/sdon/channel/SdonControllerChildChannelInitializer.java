@@ -32,6 +32,7 @@ import org.drasyl.handler.codec.JacksonCodec;
 import org.drasyl.util.Worm;
 
 import java.io.PrintStream;
+import java.security.PrivateKey;
 
 import static java.util.Objects.requireNonNull;
 import static org.drasyl.cli.sdon.SdonCommand.OBJECT_MAPPER;
@@ -41,16 +42,22 @@ public class SdonControllerChildChannelInitializer extends ConnectionChannelInit
     private final PrintStream err;
     private final Worm<Integer> exitCode;
     private final NetworkConfig networkConfig;
+    private final java.security.PublicKey publicKey;
+    private final PrivateKey privateKey;
 
     public SdonControllerChildChannelInitializer(final PrintStream out,
                                                  final PrintStream err,
                                                  final Worm<Integer> exitCode,
-                                                 final NetworkConfig networkConfig) {
+                                                 final NetworkConfig networkConfig,
+                                                 final java.security.PublicKey publicKey,
+                                                 final PrivateKey privateKey) {
         super(true, DEFAULT_SERVER_PORT);
         this.out = requireNonNull(out);
         this.err = requireNonNull(err);
         this.exitCode = requireNonNull(exitCode);
         this.networkConfig = requireNonNull(networkConfig);
+        this.publicKey = requireNonNull(publicKey);
+        this.privateKey = requireNonNull(privateKey);
     }
 
     @Override

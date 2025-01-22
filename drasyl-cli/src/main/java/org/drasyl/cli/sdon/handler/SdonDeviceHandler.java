@@ -24,7 +24,6 @@ package org.drasyl.cli.sdon.handler;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
@@ -44,7 +43,6 @@ import org.drasyl.cli.sdon.config.ControllerPolicy;
 import org.drasyl.cli.sdon.config.Policy;
 import org.drasyl.cli.sdon.config.TunPolicy;
 import org.drasyl.cli.sdon.event.SdonMessageReceived;
-import org.drasyl.cli.sdon.handler.policy.ControllerPolicyHandler;
 import org.drasyl.cli.sdon.message.ControllerHello;
 import org.drasyl.cli.sdon.message.DeviceCSR;
 import org.drasyl.cli.sdon.message.DeviceHello;
@@ -87,15 +85,21 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
     private static final int DEVICE_HELLO_INTERVAL = 5_000; // every 5 seconds
     private final PrintStream out;
     private final IdentityPublicKey controller;
+    private final PublicKey publicKey;
+    private final PrivateKey privateKey;
     private final Map<String, Object> facts;
     State state;
     public final Set<Policy> policies = new HashSet<>();
 
     public SdonDeviceHandler(final PrintStream out,
                              final IdentityPublicKey controller,
+                             final java.security.PublicKey publicKey,
+                             final PrivateKey privateKey,
                              final Map<String, Object> facts) {
         this.out = requireNonNull(out);
         this.controller = requireNonNull(controller);
+        this.publicKey = requireNonNull(publicKey);
+        this.privateKey = requireNonNull(privateKey);
         this.facts = requireNonNull(facts);
     }
 
@@ -166,7 +170,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
 
                 if (!certificates.isEmpty() && !((ControllerHello) msg).policies().isEmpty()) {
                     // load rootCertificate from file & check whether it equals the last certificate in the message
-                    final String rootCertFilePath = "cacert.crt"; // TODO: make this more dynamic
+                    final String rootCertFilePath = "cacert.crt"; // TODO: make this more dynamic (command inputs?)
                     final String rootCertString = Files.readString(Path.of(rootCertFilePath));
                     if (!(certificates.get(certificates.size() - 1).equals(rootCertString))) {
                         throw new CertificateException("Not the right root certificate!");
@@ -245,13 +249,13 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                         else if (policy instanceof ControllerPolicy) {
                             final ControllerPolicy controllerPolicy = (ControllerPolicy) policy;
                             final Boolean isSubController = controllerPolicy.is_sub_controller();
-                            String publicKeyFilePath = "device-priv.key"; // maybe more dynamic? or as keyInfo?
-                            String privateKeyFilePath = "device-pub.pem"; // maybe more dynamic? or as keyInfo?
                             final String subControllerSubnet = controllerPolicy.subnet();
+
                             if (!isSubController) { // start SubController creation process
-                                String csrAsString = createCSR(publicKeyFilePath, privateKeyFilePath, subControllerSubnet);
+                                final String csrAsString = createCSR(publicKey, privateKey, subControllerSubnet);
                                 final DeviceCSR subControllerCSR = new DeviceCSR(csrAsString);
-                                // TODO: send the CSR message
+
+                                // send the CSR message
                                 ((DrasylServerChannel) ctx.channel()).serve(controllerPolicy.controller()).addListener(new ChannelFutureListener() {
                                     @Override
                                     public void operationComplete(final ChannelFuture future) throws Exception {
@@ -302,8 +306,8 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                 policies.addAll(newPolicies);
             }
             else if (sender.equals(controller) && msg instanceof response) {
-//                final ControllerPolicyHandler controllerPolicyHandler = (ControllerPolicyHandler) ctx.channel().pipeline().get(ControllerPolicy.HANDLER_NAME);
-//                controllerPolicyHandler.setCertificateReceived(response);
+                //final ControllerPolicyHandler controllerPolicyHandler = (ControllerPolicyHandler) ctx.channel().pipeline().get(ControllerPolicy.HANDLER_NAME);
+                //controllerPolicyHandler.setCertificateReceived(response);
 
                 // FIXME: or add your logic directly here
             }
@@ -313,12 +317,8 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
         }
     }
 
-    private String createCSR(String publicKeyFilePath, String privateKeyFilePath, String subnet) throws OperatorCreationException, IOException {
+    private String createCSR(PublicKey publicKey, PrivateKey privateKey, String subnet) throws OperatorCreationException, IOException {
         Security.addProvider(new BouncyCastleProvider());
-
-        // load keys
-        final PublicKey publicKey = loadPublicKey(publicKeyFilePath);
-        final PrivateKey privateKey = loadPrivateKey(privateKeyFilePath);
 
         // create only subject info for future certificate
         final X500Name subjectName = new X500Name("CN=" + subnet);

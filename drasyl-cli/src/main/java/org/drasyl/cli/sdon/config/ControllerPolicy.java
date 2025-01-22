@@ -25,7 +25,6 @@ import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.netty.channel.ChannelPipeline;
 import io.netty.util.internal.StringUtil;
-import org.drasyl.cli.sdon.handler.policy.TunPolicyHandler;
 import org.drasyl.identity.DrasylAddress;
 import org.luaj.vm2.LuaString;
 import org.luaj.vm2.LuaValue;

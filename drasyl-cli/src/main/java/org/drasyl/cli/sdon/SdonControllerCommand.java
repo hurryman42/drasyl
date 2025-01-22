@@ -23,6 +23,10 @@ package org.drasyl.cli.sdon;
 
 import ch.qos.logback.classic.Level;
 import io.netty.channel.ChannelHandler;
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.openssl.PEMParser;
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.drasyl.cli.ChannelOptions;
 import org.drasyl.cli.ChannelOptionsDefaultProvider;
 import org.drasyl.cli.sdon.channel.SdonControllerChannelInitializer;
@@ -36,9 +40,11 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
+import java.security.PrivateKey;
 import java.util.Map;
 
 import static java.util.Objects.requireNonNull;
@@ -59,17 +65,22 @@ public class SdonControllerCommand extends ChannelOptions {
     private File configFile;
     @Option(
             names = {"--pub-key"},
+            description = "Loads the controllers public key from specified file.",
             paramLabel = "<file>",
-            defaultValue = "controller.pub"
+            defaultValue = "controller-pub.pem"
     )
     private File pubKeyFile;
     @Option(
             names = {"--priv-key"},
+            description = "Loads the controllers private key from specified file.",
             paramLabel = "<file>",
-            defaultValue = "controller.key"
+            defaultValue = "controller-priv.key"
     )
     private File privKeyFile;
+
     private NetworkConfig config;
+    private java.security.PublicKey publicKey;
+    private PrivateKey privateKey;
 
     SdonControllerCommand(final PrintStream out,
                           final PrintStream err,
@@ -79,9 +90,13 @@ public class SdonControllerCommand extends ChannelOptions {
                           final int onlineTimeoutMillis,
                           final int networkId,
                           final Map<IdentityPublicKey, InetSocketAddress> superPeers,
-                          final File configFile) {
+                          final File configFile,
+                          final File pubKeyFile,
+                          final File privKeyFile) {
         super(out, err, logLevel, identityFile, bindAddress, onlineTimeoutMillis, networkId, superPeers);
         this.configFile = requireNonNull(configFile);
+        this.pubKeyFile = requireNonNull(pubKeyFile);
+        this.privKeyFile = requireNonNull(privKeyFile);
     }
 
     @SuppressWarnings("unused")
@@ -92,6 +107,19 @@ public class SdonControllerCommand extends ChannelOptions {
     public Integer call() {
         try {
             config = NetworkConfig.parseFile(configFile);
+
+            final JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
+
+            final PEMParser pemParserPublicKey = new PEMParser(new FileReader(pubKeyFile));
+            final SubjectPublicKeyInfo publicKeyInfo = (SubjectPublicKeyInfo) pemParserPublicKey.readObject();
+            pemParserPublicKey.close();
+            publicKey = converter.getPublicKey(publicKeyInfo);
+
+            final PEMParser pemParserPrivateKey = new PEMParser(new FileReader(privKeyFile));
+            final PrivateKeyInfo privateKeyInfo = (PrivateKeyInfo) pemParserPrivateKey.readObject();
+            pemParserPrivateKey.close();
+            privateKey = converter.getPrivateKey(privateKeyInfo);
+
             return super.call();
         }
         catch (final IOException e) {
@@ -101,12 +129,12 @@ public class SdonControllerCommand extends ChannelOptions {
 
     @Override
     protected ChannelHandler getServerChannelInitializer(final Worm<Integer> exitCode) {
-        return new SdonControllerChannelInitializer(onlineTimeoutMillis, out, err, exitCode, config);
+        return new SdonControllerChannelInitializer(onlineTimeoutMillis, out, err, exitCode, config, publicKey, privateKey);
     }
 
     @Override
     protected ChannelHandler getChildChannelInitializer(final Worm<Integer> exitCode) {
-        return new SdonControllerChildChannelInitializer(out, err, exitCode, config);
+        return new SdonControllerChildChannelInitializer(out, err, exitCode, config, publicKey, privateKey);
     }
 
     @Override

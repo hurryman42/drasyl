@@ -132,7 +132,7 @@ public class Device extends LuaTable {
     static class MakeSubControllerFunction extends TwoArgFunction {
         @Override
         public LuaValue call(final LuaValue subControllerArg, final LuaValue devicesArg) {
-            //TODO: initiate the certificate process for the sub-controller
+            set("make_sub_controller", TRUE);
             return NIL;
         }
     }
