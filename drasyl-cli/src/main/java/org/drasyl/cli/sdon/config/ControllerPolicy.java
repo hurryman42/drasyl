@@ -25,13 +25,14 @@ import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.netty.channel.ChannelPipeline;
 import io.netty.util.internal.StringUtil;
+import org.drasyl.cli.sdon.handler.policy.ControllerPolicyHandler;
 import org.drasyl.identity.DrasylAddress;
 import org.luaj.vm2.LuaString;
 import org.luaj.vm2.LuaValue;
 
 import java.util.Objects;
 
-public class ControllerPolicy extends Policy {
+public class ControllerPolicy extends AbstractPolicy {
     public static final String HANDLER_NAME = StringUtil.simpleClassName(ControllerPolicy.class);
     private DrasylAddress address;
     private DrasylAddress controller;

@@ -24,7 +24,6 @@ package org.drasyl.cli.sdon.handler;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
@@ -39,8 +38,8 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.drasyl.channel.DrasylChannel;
 import org.drasyl.channel.DrasylServerChannel;
 import org.drasyl.cli.sdon.config.Device;
+import org.drasyl.cli.sdon.config.Devices;
 import org.drasyl.cli.sdon.config.Network;
-import org.drasyl.cli.sdon.config.NetworkConfig;
 import org.drasyl.cli.sdon.config.NetworkNode;
 import org.drasyl.cli.sdon.config.Policy;
 import org.drasyl.cli.sdon.event.SdonMessageReceived;
@@ -54,7 +53,6 @@ import org.drasyl.util.logging.LoggerFactory;
 import org.luaj.vm2.LuaString;
 
 import java.io.ByteArrayInputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.StringReader;
@@ -81,7 +79,8 @@ import static org.drasyl.cli.sdon.handler.SdonControllerHandler.State.INITIALIZE
 public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
     private static final Logger LOG = LoggerFactory.getLogger(SdonControllerHandler.class);
     private final PrintStream out;
-    private final NetworkConfig config;
+    private final Network network;
+    private final Devices devices;
     private final java.security.PublicKey publicKey;
     private final PrivateKey privateKey;
     private State state;
@@ -89,14 +88,23 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
     private String mySubnet;
     private Map<DrasylAddress, String> subControllerSubnets; // is this the best way to keep track of the sub-controllers here?
 
-    public SdonControllerHandler(final PrintStream out,
-                                 final NetworkConfig config,
-                                 final java.security.PublicKey publicKey,
-                                 final PrivateKey privateKey) {
+    SdonControllerHandler(final PrintStream out,
+                          final Network network,
+                          final Devices devices,
+                          final java.security.PublicKey publicKey,
+                          final PrivateKey privateKey) {
         this.out = requireNonNull(out);
-        this.config = requireNonNull(config);
+        this.network = requireNonNull(network);
+        this.devices = requireNonNull(devices);
         this.publicKey = requireNonNull(publicKey);
         this.privateKey = requireNonNull(privateKey);
+    }
+
+    public SdonControllerHandler(final PrintStream out,
+                                 final Network network,
+                                 final java.security.PublicKey publicKey,
+                                 final PrivateKey privateKey) {
+        this(out, network, new Devices(), publicKey, privateKey);
     }
 
     @Override
@@ -122,10 +130,8 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
 
             ctx.executor().scheduleAtFixedRate(() -> {
                 try {
-                    final Network network = config.network();
-
                     // call callback
-                    network.callCallback();
+                    network.callCallback(devices);
 
                     // do matchmaking
                     final Set<Device> assignedDevices = new HashSet<>();
@@ -135,7 +141,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
 
                         Device bestMatch = null;
                         int minDistance = Integer.MAX_VALUE;
-                        for (final Device device : network.getDevices()) {
+                        for (final Device device : devices.getDevicesCollection()) {
                             if (!assignedDevices.contains(device)) {
                                 final int distance = node.getDistance(device);
                                 if (distance < minDistance) {
@@ -152,7 +158,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                     }
 
                     // disseminate policies
-                    for (final Device device : network.getDevices()) {
+                    for (final Device device : devices.getDevicesCollection()) {
                         NetworkNode node = null;
                         for (final Entry<LuaString, NetworkNode> entry : nodes.entrySet()) {
                             if (Objects.equals(entry.getValue().device(), device.address())) {
@@ -230,8 +236,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                 final DeviceHello deviceHello = (DeviceHello) msg;
 
                 // add devices
-                final Network network = config.network();
-                final Device device = network.getOrCreateDevice(sender);
+                final Device device = devices.getOrCreateDevice(sender);
                 device.setFacts(deviceHello.facts());
                 device.setPolicies(deviceHello.policies());
 

@@ -21,6 +21,7 @@
  */
 package org.drasyl.cli.sdon.config;
 
+import org.drasyl.util.Worm;
 import org.drasyl.util.logging.Logger;
 import org.drasyl.util.logging.LoggerFactory;
 import org.luaj.vm2.Globals;
@@ -46,19 +47,20 @@ public class NetworkConfig {
         if (!file.exists()) {
             throw new FileNotFoundException(file.getAbsolutePath());
         }
-        final LuaValue chunk = globals().loadfile(file.toString());
+        final Worm<Network> network = Worm.of();
+        final LuaValue chunk = globals(network).loadfile(file.toString());
         chunk.call();
 
-        if (ControllerLib.network == null) {
+        if (network.isEmpty()) {
             throw new IOException("No network has been registered. Have you called register_network(net)?");
         }
 
-        return new NetworkConfig(ControllerLib.network);
+        return new NetworkConfig(network.get());
     }
 
-    private static Globals globals() {
+    private static Globals globals(final Worm<Network> network) {
         final Globals globals = JsePlatform.standardGlobals();
-        globals.load(new ControllerLib());
+        globals.load(new ControllerLib(network));
         return globals;
     }
 

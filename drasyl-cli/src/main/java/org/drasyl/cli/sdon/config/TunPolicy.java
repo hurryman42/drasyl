@@ -48,7 +48,7 @@ import static org.drasyl.util.Preconditions.requirePositive;
 /**
  * Policy for the TUN device.
  */
-public class TunPolicy extends Policy {
+public class TunPolicy extends AbstractPolicy {
     public static final String HANDLER_NAME = StringUtil.simpleClassName(TunPolicy.class);
     public static final AttributeKey<TunChannel> TUN_CHANNEL_KEY = AttributeKey.valueOf("TUN_CHANNEL_KEY");
     private final InetAddress address;

@@ -21,6 +21,8 @@
  */
 
 package org.drasyl.cli.sdon.config;
+
+import org.drasyl.util.Worm;
 import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
@@ -28,18 +30,24 @@ import org.luaj.vm2.lib.OneArgFunction;
 import org.luaj.vm2.lib.TwoArgFunction;
 
 import java.util.Collection;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Lua API provided by the controller.
  */
+@SuppressWarnings({ "java:S110", "java:S2160" })
 public class ControllerLib extends TwoArgFunction {
-    public static Network network;
+    public final Worm<Network> network;
+
+    public ControllerLib(final Worm<Network> network) {
+        this.network = requireNonNull(network);
+    }
 
     @Override
     public LuaValue call(final LuaValue modname, final LuaValue env) {
         final LuaValue library = tableOf();
         env.set("create_network", new CreateNetworkFunction());
-        env.set("register_network", new RegisterNetworkFunction());
+        env.set("register_network", new RegisterNetworkFunction(network));
         env.set("inspect", new InspectFunction());
         env.set("get_network", new GetNetworkFunction());
         env.set("elect_sub_controller", new ElectSubControllerFunction());
@@ -47,6 +55,7 @@ public class ControllerLib extends TwoArgFunction {
         return library;
     }
 
+    @SuppressWarnings("java:S110")
     static class CreateNetworkFunction extends OneArgFunction {
         @Override
         public LuaValue call(final LuaValue paramsArg) {
@@ -54,16 +63,23 @@ public class ControllerLib extends TwoArgFunction {
         }
     }
 
+    @SuppressWarnings({ "java:S110", "java:S2160" })
     static class RegisterNetworkFunction extends OneArgFunction {
+        private final Worm<Network> network;
+
+        public RegisterNetworkFunction(final Worm<Network> network) {
+            this.network = requireNonNull(network);
+        }
+
         @Override
         public LuaValue call(final LuaValue networkArg) {
             final LuaTable networkTable = networkArg.checktable();
 
-            if (network != null) {
+            if (network.isPresent()) {
                 throw new LuaError("Only one network can be registered.");
             }
 
-            network = (Network) networkTable;
+            network.set((Network) networkTable);
 
             return NIL;
         }
@@ -88,7 +104,7 @@ public class ControllerLib extends TwoArgFunction {
         public LuaValue call(final LuaValue devicesArg) {
             final LuaTable devicesTable = devicesArg.checktable();
             final Devices devices = (Devices) devicesTable;
-            final Collection<Device> deviceList = devices.getDevices();
+            final Collection<Device> deviceList = devices.getDevicesCollection();
             final Device subController = deviceList.iterator().next(); //at first calculate no score, but take the first best
             /*int bestScore = 0;
             for (Device device : deviceList) {
@@ -108,7 +124,7 @@ public class ControllerLib extends TwoArgFunction {
             // just take the first best devices
             final LuaTable devicesTable = devicesArg.checktable();
             final Devices devices = (Devices) devicesTable;
-            final Collection<Device> deviceList = devices.getDevices();
+            final Collection<Device> deviceList = devices.getDevicesCollection();
             final int amount = amountArg.toint();
             final Devices devicesToHandover = new Devices();
             for (Device device : deviceList) {

@@ -129,7 +129,7 @@ public class SdonControllerCommand extends ChannelOptions {
 
     @Override
     protected ChannelHandler getServerChannelInitializer(final Worm<Integer> exitCode) {
-        return new SdonControllerChannelInitializer(onlineTimeoutMillis, out, err, exitCode, config, publicKey, privateKey);
+        return new SdonControllerChannelInitializer(onlineTimeoutMillis, out, err, exitCode, config.network(), publicKey, privateKey);
     }
 
     @Override

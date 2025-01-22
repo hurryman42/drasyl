@@ -25,7 +25,7 @@ import io.netty.channel.ChannelPipeline;
 import org.drasyl.channel.DrasylServerChannel;
 import org.drasyl.cli.channel.AbstractChannelInitializer;
 import org.drasyl.cli.handler.PrintAndExitOnExceptionHandler;
-import org.drasyl.cli.sdon.config.NetworkConfig;
+import org.drasyl.cli.sdon.config.Network;
 import org.drasyl.cli.sdon.handler.SdonControllerHandler;
 import org.drasyl.util.Worm;
 import org.drasyl.util.logging.Logger;
@@ -42,7 +42,7 @@ public class SdonControllerChannelInitializer extends AbstractChannelInitializer
     private final PrintStream out;
     private final PrintStream err;
     private final Worm<Integer> exitCode;
-    private final NetworkConfig config;
+    private final Network network;
     private java.security.PublicKey publicKey;
     private PrivateKey privateKey;
 
@@ -51,14 +51,14 @@ public class SdonControllerChannelInitializer extends AbstractChannelInitializer
                                             final PrintStream out,
                                             final PrintStream err,
                                             final Worm<Integer> exitCode,
-                                            final NetworkConfig config,
+                                            final Network network,
                                             final java.security.PublicKey publicKey,
                                             final PrivateKey privateKey) {
         super(onlineTimeoutMillis);
         this.out = requireNonNull(out);
         this.err = requireNonNull(err);
         this.exitCode = requireNonNull(exitCode);
-        this.config = requireNonNull(config);
+        this.network = requireNonNull(network);
         this.publicKey = requireNonNull(publicKey);
         this.privateKey = requireNonNull(privateKey);
     }
@@ -68,7 +68,7 @@ public class SdonControllerChannelInitializer extends AbstractChannelInitializer
         super.initChannel(ch);
 
         final ChannelPipeline p = ch.pipeline();
-        p.addLast(new SdonControllerHandler(out, config, publicKey, privateKey));
+        p.addLast(new SdonControllerHandler(out, network, publicKey, privateKey));
         p.addLast(new PrintAndExitOnExceptionHandler(err, exitCode));
     }
 }
