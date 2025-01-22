@@ -57,6 +57,18 @@ public class SdonControllerCommand extends ChannelOptions {
             defaultValue = "network-conf.lua"
     )
     private File configFile;
+    @Option(
+            names = {"--pub-key"},
+            paramLabel = "<file>",
+            defaultValue = "controller.pub"
+    )
+    private File pubKeyFile;
+    @Option(
+            names = {"--priv-key"},
+            paramLabel = "<file>",
+            defaultValue = "controller.key"
+    )
+    private File privKeyFile;
     private NetworkConfig config;
 
     SdonControllerCommand(final PrintStream out,
