@@ -24,14 +24,16 @@ package org.drasyl.cli.sdon.config;
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.netty.channel.ChannelPipeline;
+import io.netty.util.internal.StringUtil;
+import org.drasyl.cli.sdon.handler.policy.TunPolicyHandler;
 import org.drasyl.identity.DrasylAddress;
 import org.luaj.vm2.LuaString;
 import org.luaj.vm2.LuaValue;
 
-import java.net.InetAddress;
 import java.util.Objects;
 
 public class ControllerPolicy extends Policy {
+    public static final String HANDLER_NAME = StringUtil.simpleClassName(ControllerPolicy.class);
     private DrasylAddress address;
     private DrasylAddress controller;
     private Boolean is_sub_controller;
@@ -68,13 +70,13 @@ public class ControllerPolicy extends Policy {
     }
 
     @Override
-    public void addPolicy(ChannelPipeline pipeline) {
-        // NOOP
+    public void addPolicy(final ChannelPipeline pipeline) {
+        pipeline.addLast(HANDLER_NAME, new ControllerPolicyHandler(this));
     }
 
     @Override
-    public void removePolicy(ChannelPipeline pipeline) {
-        // NOOP
+    public void removePolicy(final ChannelPipeline pipeline) {
+        pipeline.remove(HANDLER_NAME);
     }
 
     @Override

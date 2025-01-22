@@ -24,6 +24,7 @@ package org.drasyl.cli.sdon.handler;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
@@ -43,6 +44,7 @@ import org.drasyl.cli.sdon.config.ControllerPolicy;
 import org.drasyl.cli.sdon.config.Policy;
 import org.drasyl.cli.sdon.config.TunPolicy;
 import org.drasyl.cli.sdon.event.SdonMessageReceived;
+import org.drasyl.cli.sdon.handler.policy.ControllerPolicyHandler;
 import org.drasyl.cli.sdon.message.ControllerHello;
 import org.drasyl.cli.sdon.message.DeviceCSR;
 import org.drasyl.cli.sdon.message.DeviceHello;
@@ -298,6 +300,12 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
 
                 policies.clear();
                 policies.addAll(newPolicies);
+            }
+            else if (sender.equals(controller) && msg instanceof response) {
+//                final ControllerPolicyHandler controllerPolicyHandler = (ControllerPolicyHandler) ctx.channel().pipeline().get(ControllerPolicy.HANDLER_NAME);
+//                controllerPolicyHandler.setCertificateReceived(response);
+
+                // FIXME: or add your logic directly here
             }
         }
         else {
