@@ -250,6 +250,18 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                                 String csrAsString = createCSR(publicKeyFilePath, privateKeyFilePath, subControllerSubnet);
                                 final DeviceCSR subControllerCSR = new DeviceCSR(csrAsString);
                                 // TODO: send the CSR message
+                                ((DrasylServerChannel) ctx.channel()).serve(controllerPolicy.controller()).addListener(new ChannelFutureListener() {
+                                    @Override
+                                    public void operationComplete(final ChannelFuture future) throws Exception {
+                                        if (future.isSuccess()) {
+                                            final Channel channelToController = future.channel();
+                                            channelToController.writeAndFlush(subControllerCSR).addListener(FIRE_EXCEPTION_ON_FAILURE);
+                                        }
+                                        else {
+                                            throw (Exception) future.cause();
+                                        }
+                                    }
+                                });
                             }
                         }
                     }
