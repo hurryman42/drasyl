@@ -26,13 +26,9 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.x500.X500Name;
-import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.openssl.PEMParser;
-import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
@@ -53,7 +49,6 @@ import org.drasyl.util.logging.Logger;
 import org.drasyl.util.logging.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.net.InetAddress;
@@ -275,6 +270,10 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                 else if (certificates.isEmpty() && !((ControllerHello) msg).policies().isEmpty()) {
                     throw new CertificateException("No certificates although there are policies.");
                 }
+                else if (!certificates.isEmpty() && ((ControllerHello) msg).policies().isEmpty()) {
+                    final String myNewCertificateString = certificates.getFirst();
+                    // TODO: change this device to a controller with the new certificate
+                }
 
                 // set state to JOINED if it is not already
                 if (state != JOINED) {
@@ -305,12 +304,6 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                 policies.clear();
                 policies.addAll(newPolicies);
             }
-            else if (sender.equals(controller) && msg instanceof response) {
-                //final ControllerPolicyHandler controllerPolicyHandler = (ControllerPolicyHandler) ctx.channel().pipeline().get(ControllerPolicy.HANDLER_NAME);
-                //controllerPolicyHandler.setCertificateReceived(response);
-
-                // FIXME: or add your logic directly here
-            }
         }
         else {
             ctx.fireUserEventTriggered(evt);
@@ -331,22 +324,6 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
         final PKCS10CertificationRequest csr = csrBuilder.build(signer);
 
         return convertCSRToPemString(csr);
-    }
-
-    private static PrivateKey loadPrivateKey(String privateKeyFilePath) throws IOException {
-        final PEMParser pemParser = new PEMParser(new FileReader(privateKeyFilePath));
-        final PrivateKeyInfo keyInfo = (PrivateKeyInfo) pemParser.readObject();
-        pemParser.close();
-        final JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
-        return converter.getPrivateKey(keyInfo);
-    }
-
-    private static PublicKey loadPublicKey(String publicKeyFilePath) throws IOException {
-        final PEMParser pemParser = new PEMParser(new FileReader(publicKeyFilePath));
-        final SubjectPublicKeyInfo keyInfo = (SubjectPublicKeyInfo) pemParser.readObject();
-        pemParser.close();
-        final JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
-        return converter.getPublicKey(keyInfo);
     }
 
     private static String convertCSRToPemString(final PKCS10CertificationRequest csr) throws IOException {

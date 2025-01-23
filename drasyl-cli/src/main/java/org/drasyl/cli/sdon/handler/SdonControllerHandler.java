@@ -58,11 +58,14 @@ import java.io.PrintStream;
 import java.io.StringReader;
 import java.math.BigInteger;
 import java.net.InetAddress;
+import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.Base64;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -191,7 +194,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
 
                                 // the smallerSubnet String is always created but only when a devicePolicy with this subnet is created, it is added to subControllerSubnets
                                 final String smallerSubnet = address.toString() + "/" + (netmask + 8); // + 8 probably not the best always
-                                Set<Policy> devicePolicies = device.createPolicies(smallerSubnet);
+                                final Set<Policy> devicePolicies = device.createPolicies(smallerSubnet);
                                 if (!devicePolicies.isEmpty()) {
                                     subControllerSubnets.put(device.address(), smallerSubnet);
                                     policies.addAll(devicePolicies);
@@ -298,12 +301,11 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                 // build the certificate
                 final X509Certificate certificate = new JcaX509CertificateConverter().getCertificate(certBuilder.build(signer));
 
-                final ControllerHello response = new ControllerHello();
-                // TODO: send the certificate back (as a certificate in the ControllerHello (somehow tell the Device that there is an special extra certificate in this message))
+                final Set<Policy> policies = Set.of();
+                final List<String> certificates = List.of(convertCertToPem(certificate));
+                final ControllerHello response = new ControllerHello(policies, certificates);
+
                 final DrasylChannel channel = ((DrasylServerChannel) ctx.channel()).getChannels().get(sender);
-
-                //final SdonMessage response = null; // specify actual response
-
                 LOG.debug("Send {} to {}.", response, sender);
                 channel.writeAndFlush(response).addListener(FIRE_EXCEPTION_ON_FAILURE);
             }
@@ -311,6 +313,12 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
         else {
             ctx.fireUserEventTriggered(evt);
         }
+    }
+
+    private static String convertCertToPem(final X509Certificate certificate) throws CertificateEncodingException, IOException {
+        final Base64.Encoder encoder = Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.UTF_8));
+        final byte[] cert = certificate.getEncoded();
+        return "-----END CERTIFICATE-----" + "\n" + encoder.encodeToString(cert) + "\n" + "-----END PRIVATE KEY-----";
     }
 
     enum State {

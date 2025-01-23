@@ -3,9 +3,8 @@ LOW_WATERMARK = 3 -- device count for when to decommission a sub-controller
 
 -- in the naming scheme, "we" are the top-level controller of this network
 local our_devices = {} -- unordered list of all our devices
-local not_our_devices = {} -- unordered list of the devices that are not offloaded
-local our_sub_controllers = {} -- unordered list of all our sub-controller(s)
 local controller_of_devices = {} -- mapping of device to its controller
+--local our_sub_controllers = {} -- unordered list of all our sub-controller(s)
 
 -- if the controller of the device is the top-level controller ("us"), then the device.controllerAddress = ""
 
@@ -20,27 +19,26 @@ net = create_network()
 net:set_callback(function(my_net, devices) -- set_callback is called every 5000ms
     -- fill tables
     our_devices = {}
-    not_our_devices = {}
-    our_sub_controllers = {}
+    --our_sub_controllers = {}
     for i, device in ipairs(devices) do
         if device.is_sub_controller == true then -- device is sub-controller
-            table.insert(our_sub_controllers, device)
+            --table.insert(our_sub_controllers, device)
+            controller_of_devices[device] = ""
         elseif device.controllerAddress != "" then -- device controlled by sub-controller
-            table.insert(not_our_devices, device)
+            controller_of_devices[device] = device.controllerAddress
         elseif device.controllerAddress == "" then -- device controlled by "us" (top-level controller)
             table.insert(our_devices, device)
+            controller_of_devices[device] = ""
         end
     end
 
     -- DEBUG printing
     for i, device in ipairs(our_devices) do print(device) end
     print("-----")
-    for i, device in ipairs(not_our_devices) do print(device) end
-    print("-----")
-    for i, device in ipairs(our_sub_controllers) do print(device) end
-    print("-----")
     for device, controller in pairs(controller_of_devices) do print(device .. ": " .. controller) end
     print("-----")
+    --for i, device in ipairs(our_sub_controllers) do print(device) end
+    --print("-----")
 
     if #our_devices >= HIGH_WATERMARK then -- sub controller needed
         print("controller is preparing to offload...")
@@ -56,15 +54,12 @@ net:set_callback(function(my_net, devices) -- set_callback is called every 5000m
             devices_to_handover[i] = our_devices[1]
             controller_of_devices[our_devices[1]] = sub_controller -- this makes the devices_to_handover variable useless, but maybe its needed with a more sophisticated solution
             our_devices[1].controllerAddress = sub_controller
-            table.insert(not_our_devices, our_devices[1])
             table.remove(our_devices, 1)
         end
         -- devices_to_handover = elect_devices_to_handover(devices, #our_devices - LOW_WATERMARK)
 
         -- DEBUG printing
         for i, device in ipairs(our_devices) do print(device) end
-        print("-----")
-        for i, device in ipairs(not_our_devices) do print(device) end
         print("-----")
         for i, device in ipairs(devices_to_handover) do print(device) end
         print("-----")
