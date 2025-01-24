@@ -249,6 +249,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                             if (!isSubController) { // start SubController creation process
                                 final String csrAsString = createCSR(publicKey, privateKey, subControllerSubnet);
                                 final DeviceCSR subControllerCSR = new DeviceCSR(csrAsString);
+                                out.println("Generated DeviceCSR message. Sending to Controller now.");
 
                                 // send the CSR message
                                 ((DrasylServerChannel) ctx.channel()).serve(controllerPolicy.controller()).addListener(new ChannelFutureListener() {
@@ -271,7 +272,8 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                     throw new CertificateException("No certificates although there are policies.");
                 }
                 else if (!certificates.isEmpty() && ((ControllerHello) msg).policies().isEmpty()) {
-                    final String myNewCertificateString = certificates.getFirst();
+                    final String myNewCertificateString = certificates.get(0);
+                    out.println("Received certificate from controller. Starting transformation to sub-controller now.");
                     // TODO: change this device to a controller with the new certificate
                 }
 

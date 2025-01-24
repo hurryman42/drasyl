@@ -174,7 +174,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                             policies = node.createPolicies();
                             certificates = node.loadCertificates("chain.crt");
 
-                            final String myCertString = certificates.getLast();
+                            final String myCertString = certificates.get(0);
                             final CertificateFactory cf = CertificateFactory.getInstance("X.509");
                             myCert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(myCertString.getBytes()));
 
@@ -259,6 +259,8 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                 }
             }
             else if (msg instanceof DeviceCSR) {
+                out.println("Received DeviceCSR from device. Signing certificate now.");
+
                 final DeviceCSR deviceCSR = (DeviceCSR) msg;
                 final String csrString = deviceCSR.csr();
 
@@ -304,6 +306,8 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                 final Set<Policy> policies = Set.of();
                 final List<String> certificates = List.of(convertCertToPem(certificate));
                 final ControllerHello response = new ControllerHello(policies, certificates);
+
+                out.println("Generated ControllerHello response. Now sending to Device.");
 
                 final DrasylChannel channel = ((DrasylServerChannel) ctx.channel()).getChannels().get(sender);
                 LOG.debug("Send {} to {}.", response, sender);

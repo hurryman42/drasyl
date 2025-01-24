@@ -108,7 +108,7 @@ public class SdonControllerCommand extends ChannelOptions {
         try {
             config = NetworkConfig.parseFile(configFile);
 
-            final JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
+            final JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
 
             final PEMParser pemParserPublicKey = new PEMParser(new FileReader(pubKeyFile));
             final SubjectPublicKeyInfo publicKeyInfo = (SubjectPublicKeyInfo) pemParserPublicKey.readObject();
