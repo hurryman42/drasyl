@@ -95,7 +95,6 @@ net:set_callback(
                                 table.insert(our_devices, device)
                             end
                         end
-
                         --subnet = get_network(device)
                         --devices = get_devices(subnet)
                         --links = get_links(subnet)

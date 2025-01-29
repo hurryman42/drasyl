@@ -36,21 +36,24 @@ import java.util.Set;
  * Represents a device (a node or a sub-controller).
  */
 public class Device extends LuaTable {
-    Device(final DrasylAddress address, final DrasylAddress controllerAddress) {
+    public Device(final DrasylAddress address, final DrasylAddress controllerAddress) {
         set("address", LuaValue.valueOf(address.toString()));
         set("online", FALSE);
         set("facts", tableOf());
         set("policies", tableOf());
         set("is_sub_controller", FALSE);
+        set("my_devices", tableOf());
         set("controller_address", LuaValue.valueOf(controllerAddress.toString()));
+        set("make_sub_controller", new MakeSubControllerFunction());
     }
 
-    Device(final DrasylAddress address) {
+    public Device(final DrasylAddress address) {
         set("address", LuaValue.valueOf(address.toString()));
         set("online", FALSE);
         set("facts", tableOf());
         set("policies", tableOf());
         set("is_sub_controller", FALSE);
+        set("my_devices", tableOf());
         set("controller_address", LuaValue.valueOf(""));
         set("make_sub_controller", new MakeSubControllerFunction());
     }
@@ -63,6 +66,7 @@ public class Device extends LuaTable {
         stringTable.set("facts", get("facts"));
         stringTable.set("policies", get("policies"));
         stringTable.set("is_sub_controller", get("is_sub_controller"));
+        stringTable.set("my_devices", get("my_devices"));
         stringTable.set("controllerAddress", get("controllerAddress"));
         return "Device" + LuaHelper.toString(stringTable);
     }
@@ -107,7 +111,10 @@ public class Device extends LuaTable {
     public Set<Policy> createPolicies(String subnet) {
         final Set<Policy> policies = new HashSet<>();
         if (get("make_sub_controller") == TRUE) {
-            final Policy controllerPolicy = new ControllerPolicy(address(), controllerAddress(), isSubController(), subnet);
+            LuaTable devs = (LuaTable) get("my_devices"); // why is this cast to LuaTable necessary here?
+            final Devices myDevices = (Devices) devs;
+            final Set<DrasylAddress> myDeviceAddresses = myDevices.getDeviceAddresses();
+            final Policy controllerPolicy = new SubControllerPolicy(address(), controllerAddress(), myDeviceAddresses, isSubController(), subnet);
             policies.add(controllerPolicy);
         }
         return policies;
@@ -133,6 +140,9 @@ public class Device extends LuaTable {
         @Override
         public LuaValue call(final LuaValue subControllerArg, final LuaValue devicesArg) {
             set("make_sub_controller", TRUE);
+            final LuaTable devicesTable = devicesArg.checktable();
+            set("my_devices", devicesTable);
+            final Devices devices = (Devices) devicesTable;
             return NIL;
         }
     }

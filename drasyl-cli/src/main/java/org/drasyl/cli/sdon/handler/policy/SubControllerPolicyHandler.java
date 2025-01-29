@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2024 Heiko Bornholdt and Kevin Röbert
+ * Copyright (c) 2020-2025 Heiko Bornholdt and Kevin Röbert
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,37 +19,31 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
  * OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package org.drasyl.cli.sdon.config;
+package org.drasyl.cli.sdon.handler.policy;
 
-import org.drasyl.cli.util.LuaHelper;
-import org.drasyl.identity.DrasylAddress;
-import org.luaj.vm2.LuaTable;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import org.drasyl.cli.sdon.config.SubControllerPolicy;
+import org.drasyl.util.logging.Logger;
+import org.drasyl.util.logging.LoggerFactory;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import static java.util.Objects.requireNonNull;
 
-public class Devices extends LuaTable {
-    private final Map<DrasylAddress, Device> devicesMap = new HashMap<>();
+public class SubControllerPolicyHandler extends ChannelInboundHandlerAdapter {
+    private static final Logger LOG = LoggerFactory.getLogger(SubControllerPolicyHandler.class);
+    private final SubControllerPolicy policy;
 
-    public Devices() {
+    public SubControllerPolicyHandler(final SubControllerPolicy policy) {
+        this.policy = requireNonNull(policy);
     }
 
     @Override
-    public String toString() {
-        return "Devices" + LuaHelper.toString(LuaHelper.createTable(devicesMap.values()));
+    public void handlerAdded(final ChannelHandlerContext ctx) {
+        // NOOP
     }
 
-    public Device getOrCreateDevice(final DrasylAddress address) {
-        return devicesMap.computeIfAbsent(address, Device::new);
-    }
-
-    public Collection<Device> getDevicesCollection() {
-        return devicesMap.values();
-    }
-
-    public Set<DrasylAddress> getDeviceAddresses() {
-        return devicesMap.keySet();
+    @Override
+    public void handlerRemoved(final ChannelHandlerContext ctx) {
+        // NOOP
     }
 }

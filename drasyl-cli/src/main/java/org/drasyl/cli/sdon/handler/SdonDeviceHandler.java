@@ -34,7 +34,10 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
 import org.drasyl.channel.DrasylServerChannel;
-import org.drasyl.cli.sdon.config.ControllerPolicy;
+import org.drasyl.cli.sdon.config.ControlledPolicy;
+import org.drasyl.cli.sdon.config.Device;
+import org.drasyl.cli.sdon.config.Devices;
+import org.drasyl.cli.sdon.config.SubControllerPolicy;
 import org.drasyl.cli.sdon.config.Policy;
 import org.drasyl.cli.sdon.config.TunPolicy;
 import org.drasyl.cli.sdon.event.SdonMessageReceived;
@@ -82,6 +85,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
     private final IdentityPublicKey controller;
     private final PublicKey publicKey;
     private final PrivateKey privateKey;
+    private X509Certificate certificate;
     private final Map<String, Object> facts;
     State state;
     public final Set<Policy> policies = new HashSet<>();
@@ -237,30 +241,61 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                                 throw new Exception("The netmask of the IP address from the policy is not the same as netmask from the controller's certificate.");
                             }*/
                         }
-                        else if (policy instanceof ControllerPolicy) {
-                            final ControllerPolicy controllerPolicy = (ControllerPolicy) policy;
-                            final Boolean isSubController = controllerPolicy.is_sub_controller();
-                            final String subControllerSubnet = controllerPolicy.subnet();
+                        else if (policy instanceof SubControllerPolicy) {
+                            final SubControllerPolicy subControllerPolicy = (SubControllerPolicy) policy;
+                            final Boolean isSubController = subControllerPolicy.is_sub_controller();
+                            final String subControllerSubnet = subControllerPolicy.subnet();
+                            final DrasylAddress myAddress = subControllerPolicy.address();
 
-                            if (!isSubController) { // start SubController creation process
+                            if (!isSubController) { // start SubController creation process: create and send a DeviceCSR
                                 final String csrAsString = createCSR(publicKey, privateKey, subControllerSubnet);
                                 final DeviceCSR subControllerCSR = new DeviceCSR(csrAsString);
-                                out.println("Generated DeviceCSR message. Sending to Controller now.");
+                                out.println("Generated DeviceCSR message. Sending to controller now.");
 
                                 // send the CSR message
-                                ((DrasylServerChannel) ctx.channel()).serve(controllerPolicy.controller()).addListener(new ChannelFutureListener() {
-                                    @Override
-                                    public void operationComplete(final ChannelFuture future) throws Exception {
+                                ((DrasylServerChannel) ctx.channel()).serve(subControllerPolicy.controller()).addListener((ChannelFutureListener) future -> {
+                                    if (future.isSuccess()) {
+                                        final Channel channelToController = future.channel();
+                                        channelToController.writeAndFlush(subControllerCSR).addListener(FIRE_EXCEPTION_ON_FAILURE);
+                                    }
+                                    else {
+                                        throw (Exception) future.cause();
+                                    }
+                                });
+                            }
+                            else { // the device is a sub-controller --> it receives SubControllerPolicies & sends ControlledPolicies to its devices
+                                final Set<DrasylAddress> myDeviceAddresses = subControllerPolicy.devices();
+                                final Devices myDevices = new Devices();
+
+                                // maybe individual policy type created by that sub-controller and only send by it (metaprogramming)
+                                final ControlledPolicy controlledPolicy = new ControlledPolicy(myAddress);
+
+                                final Set<Policy> devicePolicies = Set.of(controlledPolicy); // TODO: needs additional TunPolicy and not only ControlledPolicy?
+                                final DeviceHello message = new DeviceHello(facts, devicePolicies);
+
+                                for (DrasylAddress deviceAddress : myDeviceAddresses) {
+                                    // add this Device to the Devices Object
+                                    final Device thisDevice = new Device(deviceAddress, myAddress);
+                                    myDevices.add(thisDevice);
+
+                                    // send the ControlledPolicy via a DeviceHello to the device
+                                    ((DrasylServerChannel) ctx.channel()).serve(deviceAddress).addListener((ChannelFutureListener) future -> {
                                         if (future.isSuccess()) {
                                             final Channel channelToController = future.channel();
-                                            channelToController.writeAndFlush(subControllerCSR).addListener(FIRE_EXCEPTION_ON_FAILURE);
+                                            channelToController.writeAndFlush(message).addListener(FIRE_EXCEPTION_ON_FAILURE);
                                         }
                                         else {
                                             throw (Exception) future.cause();
                                         }
-                                    }
-                                });
+                                    });
+                                }
                             }
+                        }
+                        else if (policy instanceof ControlledPolicy) {
+                            final ControlledPolicy controlledPolicy = (ControlledPolicy) policy;
+                            final DrasylAddress controllerAddress = controlledPolicy.controller();
+                            out.println("Received ControlledPolicy with the address of my new Controller.");
+                            out.println("My Controller's Address is " + controllerAddress.toString());
                         }
                     }
                 }
@@ -269,8 +304,9 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                 }
                 else if (!certificates.isEmpty() && ((ControllerHello) msg).policies().isEmpty()) {
                     final String myNewCertificateString = certificates.get(0);
-                    out.println("Received certificate from controller. Starting transformation to sub-controller now.");
-                    // TODO: change this device to a controller with the new certificate
+                    final CertificateFactory cf = CertificateFactory.getInstance("X.509");
+                    certificate = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(myNewCertificateString.getBytes()));
+                    out.println("Received certificate from controller.");
                 }
 
                 // set state to JOINED if it is not already

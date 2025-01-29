@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2024 Heiko Bornholdt and Kevin Röbert
+ * Copyright (c) 2020-2025 Heiko Bornholdt and Kevin Röbert
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,26 +25,30 @@ import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.netty.channel.ChannelPipeline;
 import io.netty.util.internal.StringUtil;
-import org.drasyl.cli.sdon.handler.policy.ControllerPolicyHandler;
+import org.drasyl.cli.sdon.handler.policy.SubControllerPolicyHandler;
 import org.drasyl.identity.DrasylAddress;
 import org.luaj.vm2.LuaString;
 import org.luaj.vm2.LuaValue;
 
 import java.util.Objects;
+import java.util.Set;
 
-public class ControllerPolicy extends AbstractPolicy {
-    public static final String HANDLER_NAME = StringUtil.simpleClassName(ControllerPolicy.class);
+public class SubControllerPolicy extends AbstractPolicy {
+    public static final String HANDLER_NAME = StringUtil.simpleClassName(SubControllerPolicy.class);
     private DrasylAddress address;
     private DrasylAddress controller;
+    private Set<DrasylAddress> devices;
     private Boolean is_sub_controller;
     private String subnet; // this as a String? not as an actual address with netmask?
 
-    public ControllerPolicy(@JsonProperty("address") final DrasylAddress address,
-                            @JsonProperty("controller") final DrasylAddress controller,
-                            @JsonProperty("is_sub_controller") final Boolean isSubController,
-                            @JsonProperty("subnet") final String subnet) {
+    public SubControllerPolicy(@JsonProperty("address") final DrasylAddress address,
+                               @JsonProperty("controller") final DrasylAddress controller,
+                               @JsonProperty("devices") final Set<DrasylAddress> devices,
+                               @JsonProperty("is_sub_controller") final Boolean isSubController,
+                               @JsonProperty("subnet") final String subnet) {
         this.address = address;
         this.controller = controller;
+        this.devices = devices;
         this.is_sub_controller = isSubController;
         this.subnet = subnet;
     }
@@ -59,6 +63,11 @@ public class ControllerPolicy extends AbstractPolicy {
         return controller;
     }
 
+    @JsonGetter("devices")
+    public Set<DrasylAddress> devices() {
+        return devices;
+    }
+
     @JsonGetter("is_sub_controller")
     public Boolean is_sub_controller() {
         return is_sub_controller;
@@ -71,7 +80,7 @@ public class ControllerPolicy extends AbstractPolicy {
 
     @Override
     public void addPolicy(final ChannelPipeline pipeline) {
-        pipeline.addLast(HANDLER_NAME, new ControllerPolicyHandler(this));
+        pipeline.addLast(HANDLER_NAME, new SubControllerPolicyHandler(this));
     }
 
     @Override
@@ -97,13 +106,17 @@ public class ControllerPolicy extends AbstractPolicy {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        final ControllerPolicy that = (ControllerPolicy) o;
-        return Objects.equals(address, that.address) && Objects.equals(controller, that.controller) && Objects.equals(is_sub_controller, that.is_sub_controller) && Objects.equals(subnet, that.subnet);
+        final SubControllerPolicy that = (SubControllerPolicy) o;
+        return Objects.equals(address, that.address)
+                && Objects.equals(controller, that.controller)
+                && Objects.equals(devices, that.devices)
+                && Objects.equals(is_sub_controller, that.is_sub_controller)
+                && Objects.equals(subnet, that.subnet);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(address, controller, is_sub_controller, subnet);
+        return Objects.hash(address, controller, devices, is_sub_controller, subnet);
     }
 
     @Override
@@ -111,6 +124,7 @@ public class ControllerPolicy extends AbstractPolicy {
         return "DevicePolicy{" +
                 "address=" + address +
                 ", controller=" + controller +
+                ", devices=" + devices +
                 ", sub-controller" + is_sub_controller +
                 ", state=" + state +
                 ", subnet=" + subnet +

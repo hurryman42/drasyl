@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2024 Heiko Bornholdt and Kevin Röbert
+ * Copyright (c) 2020-2025 Heiko Bornholdt and Kevin Röbert
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -194,7 +194,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
 
                                 // the smallerSubnet String is always created but only when a devicePolicy with this subnet is created, it is added to subControllerSubnets
                                 final String smallerSubnet = address.toString() + "/" + (netmask + 8); // + 8 probably not the best always
-                                final Set<Policy> devicePolicies = device.createPolicies(smallerSubnet);
+                                final Set<Policy> devicePolicies = device.createPolicies(smallerSubnet, subControllerDevices);
                                 if (!devicePolicies.isEmpty()) {
                                     subControllerSubnets.put(device.address(), smallerSubnet);
                                     policies.addAll(devicePolicies);

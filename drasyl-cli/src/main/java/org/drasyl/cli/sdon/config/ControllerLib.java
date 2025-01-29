@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2024 Heiko Bornholdt and Kevin Röbert
+ * Copyright (c) 2020-2025 Heiko Bornholdt and Kevin Röbert
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,7 +19,6 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
  * OR OTHER DEALINGS IN THE SOFTWARE.
  */
-
 package org.drasyl.cli.sdon.config;
 
 import org.drasyl.util.Worm;
@@ -105,7 +104,7 @@ public class ControllerLib extends TwoArgFunction {
             final LuaTable devicesTable = devicesArg.checktable();
             final Devices devices = (Devices) devicesTable;
             final Collection<Device> deviceList = devices.getDevicesCollection();
-            final Device subController = deviceList.iterator().next(); //at first calculate no score, but take the first best
+            final Device subController = deviceList.iterator().next(); // at first calculate no score, but take the first best
             /*int bestScore = 0;
             for (Device device : deviceList) {
                 int currentDeviceScore = device.calculateConnectionScore(); // TODO: write function that calculates good score for the selection of sub-controller

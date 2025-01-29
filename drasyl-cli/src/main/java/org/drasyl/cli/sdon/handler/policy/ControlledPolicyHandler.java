@@ -23,17 +23,17 @@ package org.drasyl.cli.sdon.handler.policy;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import org.drasyl.cli.sdon.config.ControllerPolicy;
+import org.drasyl.cli.sdon.config.ControlledPolicy;
 import org.drasyl.util.logging.Logger;
 import org.drasyl.util.logging.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
-public class ControllerPolicyHandler extends ChannelInboundHandlerAdapter {
-    private static final Logger LOG = LoggerFactory.getLogger(ControllerPolicyHandler.class);
-    private final ControllerPolicy policy;
+public class ControlledPolicyHandler extends ChannelInboundHandlerAdapter {
+    private static final Logger LOG = LoggerFactory.getLogger(SubControllerPolicyHandler.class);
+    private final ControlledPolicy policy;
 
-    public ControllerPolicyHandler(final ControllerPolicy policy) {
+    public ControlledPolicyHandler(final ControlledPolicy policy) {
         this.policy = requireNonNull(policy);
     }
 
