@@ -144,7 +144,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
 
                         Device bestMatch = null;
                         int minDistance = Integer.MAX_VALUE;
-                        for (final Device device : devices.getDevicesCollection()) {
+                        for (final Device device : devices.getDevices()) {
                             if (!assignedDevices.contains(device)) {
                                 final int distance = node.getDistance(device);
                                 if (distance < minDistance) {
@@ -161,7 +161,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                     }
 
                     // disseminate policies
-                    for (final Device device : devices.getDevicesCollection()) {
+                    for (final Device device : devices.getDevices()) {
                         NetworkNode node = null;
                         for (final Entry<LuaString, NetworkNode> entry : nodes.entrySet()) {
                             if (Objects.equals(entry.getValue().device(), device.address())) {

@@ -28,6 +28,7 @@ import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 import org.luaj.vm2.lib.TwoArgFunction;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -111,9 +112,13 @@ public class Device extends LuaTable {
     public Set<Policy> createPolicies(String subnet) {
         final Set<Policy> policies = new HashSet<>();
         if (get("make_sub_controller") == TRUE) {
-            LuaTable devs = (LuaTable) get("my_devices"); // why is this cast to LuaTable necessary here?
+            LuaTable devs = get("my_devices").checktable();
             final Devices myDevices = (Devices) devs;
-            final Set<DrasylAddress> myDeviceAddresses = myDevices.getDeviceAddresses();
+            final Collection<Device> myDeviceCollection = myDevices.getDevices();
+            final Set<DrasylAddress> myDeviceAddresses = new HashSet<>();
+            for (Device device : myDeviceCollection) {
+                myDeviceAddresses.add(device.address());
+            }
             final Policy controllerPolicy = new SubControllerPolicy(address(), controllerAddress(), myDeviceAddresses, isSubController(), subnet);
             policies.add(controllerPolicy);
         }

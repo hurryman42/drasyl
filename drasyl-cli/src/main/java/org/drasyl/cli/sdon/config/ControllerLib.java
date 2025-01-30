@@ -103,7 +103,7 @@ public class ControllerLib extends TwoArgFunction {
         public LuaValue call(final LuaValue devicesArg) {
             final LuaTable devicesTable = devicesArg.checktable();
             final Devices devices = (Devices) devicesTable;
-            final Collection<Device> deviceList = devices.getDevicesCollection();
+            final Collection<Device> deviceList = devices.getDevices();
             final Device subController = deviceList.iterator().next(); // at first calculate no score, but take the first best
             /*int bestScore = 0;
             for (Device device : deviceList) {
@@ -123,7 +123,7 @@ public class ControllerLib extends TwoArgFunction {
             // just take the first best devices
             final LuaTable devicesTable = devicesArg.checktable();
             final Devices devices = (Devices) devicesTable;
-            final Collection<Device> deviceList = devices.getDevicesCollection();
+            final Collection<Device> deviceList = devices.getDevices();
             final int amount = amountArg.toint();
             final Devices devicesToHandover = new Devices();
             for (Device device : deviceList) {
