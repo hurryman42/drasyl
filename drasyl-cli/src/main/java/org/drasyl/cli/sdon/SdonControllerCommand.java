@@ -63,6 +63,7 @@ public class SdonControllerCommand extends ChannelOptions {
             defaultValue = "network-conf.lua"
     )
     private File configFile;
+
     @Option(
             names = {"--pub-key"},
             description = "Loads the controllers public key from specified file.",
@@ -70,6 +71,7 @@ public class SdonControllerCommand extends ChannelOptions {
             defaultValue = "controller-pub.pem"
     )
     private File pubKeyFile;
+
     @Option(
             names = {"--priv-key"},
             description = "Loads the controllers private key from specified file.",

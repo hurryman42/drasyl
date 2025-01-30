@@ -68,20 +68,25 @@ public class SdonDeviceCommand extends ChannelOptions {
             required = true
     )
     private IdentityPublicKey controller;
+
     @Option(
             names = {"--pub-key"},
             description = "Loads the controllers public key from specified file.",
-            paramLabel = "<file>",
-            defaultValue = "controller-pub.pem"
+            paramLabel = "<public-key-file>",
+            required = true
+            //defaultValue = "controller-pub.pem"
     )
     private File pubKeyFile;
+
     @Option(
             names = {"--priv-key"},
             description = "Loads the controllers private key from specified file.",
-            paramLabel = "<file>",
-            defaultValue = "controller-priv.key"
+            paramLabel = "<private-key-file>",
+            required = true
+            //defaultValue = "controller-priv.key"
     )
     private File privKeyFile;
+
     @Option(
             names = {"--tag"},
             description = "Associate device with given tags, used by controller to assign specific tasks."
@@ -109,8 +114,8 @@ public class SdonDeviceCommand extends ChannelOptions {
         this.privKeyFile = requireNonNull(privKeyFile);
         this.tags = requireNonNull(tags);
 
-        try {
-            final JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
+        /*try {
+            final JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
 
             final PEMParser pemParserPublicKey = new PEMParser(new FileReader(this.pubKeyFile));
             final SubjectPublicKeyInfo publicKeyInfo = (SubjectPublicKeyInfo) pemParserPublicKey.readObject();
@@ -124,11 +129,33 @@ public class SdonDeviceCommand extends ChannelOptions {
         }
         catch (IOException e) {
             throw new RuntimeException(e);
-        }
+        }*/
     }
 
     @SuppressWarnings("unused")
     public SdonDeviceCommand() {
+    }
+
+    @Override
+    public Integer call() {
+        try {
+            final JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
+
+            final PEMParser pemParserPublicKey = new PEMParser(new FileReader(this.pubKeyFile));
+            final SubjectPublicKeyInfo publicKeyInfo = (SubjectPublicKeyInfo) pemParserPublicKey.readObject();
+            pemParserPublicKey.close();
+            publicKey = converter.getPublicKey(publicKeyInfo);
+
+            final PEMParser pemParserPrivateKey = new PEMParser(new FileReader(this.privKeyFile));
+            final PrivateKeyInfo privateKeyInfo = (PrivateKeyInfo) pemParserPrivateKey.readObject();
+            pemParserPrivateKey.close();
+            privateKey = converter.getPrivateKey(privateKeyInfo);
+
+            return super.call();
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override

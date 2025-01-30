@@ -21,17 +21,24 @@ net:set_callback(
         just_starting = true
         our_devices = {}
         --our_sub_controllers = {}
+        print(devices[0])
+        for i, device in ipairs(devices) do print(device) end
+
         for i, device in ipairs(devices) do
+            print("devices not empty")
+            print("device.controllerAddress: " .. device.controller_address)
             if device.is_sub_controller == true then -- device is sub-controller
                 --table.insert(our_sub_controllers, device)
                 controller_of_devices[device] = ""
-            elseif device.controllerAddress ~= "" then -- device controlled by sub-controller
-                controller_of_devices[device] = device.controllerAddress
-            elseif device.controllerAddress == "" then -- device controlled by "us" (top-level controller)
+            elseif device.controller_address ~= "" then -- device controlled by sub-controller
+                controller_of_devices[device] = device.controller_address
+            elseif device.controller_address == "" then -- device controlled by "us" (top-level controller)
                 table.insert(our_devices, device)
                 controller_of_devices[device] = ""
             end
         end
+
+        --print(inspect(our_devices))
 
         -- DEBUG printing
         for i, device in ipairs(our_devices) do print(device) end

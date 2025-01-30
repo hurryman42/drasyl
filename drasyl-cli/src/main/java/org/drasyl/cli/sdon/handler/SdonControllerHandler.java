@@ -194,7 +194,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
 
                                 // the smallerSubnet String is always created but only when a devicePolicy with this subnet is created, it is added to subControllerSubnets
                                 final String smallerSubnet = address.toString() + "/" + (netmask + 8); // + 8 probably not the best always
-                                final Set<Policy> devicePolicies = device.createPolicies(smallerSubnet, subControllerDevices);
+                                final Set<Policy> devicePolicies = device.createPolicies(smallerSubnet);
                                 if (!devicePolicies.isEmpty()) {
                                     subControllerSubnets.put(device.address(), smallerSubnet);
                                     policies.addAll(devicePolicies);
@@ -238,7 +238,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
             if (msg instanceof DeviceHello) {
                 final DeviceHello deviceHello = (DeviceHello) msg;
 
-                // add devices
+                // add device
                 final Device device = devices.getOrCreateDevice(sender);
                 device.setFacts(deviceHello.facts());
                 device.setPolicies(deviceHello.policies());
@@ -267,7 +267,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                 final PEMParser pemParserCSR = new PEMParser(new StringReader(csrString));
                 final PKCS10CertificationRequest csr = (PKCS10CertificationRequest) pemParserCSR.readObject();
                 pemParserCSR.close();
-                final JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
+                final JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
 
                 // get public key out of the CSR
                 final SubjectPublicKeyInfo csrPublicKeyInfo = csr.getSubjectPublicKeyInfo();

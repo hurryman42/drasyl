@@ -142,7 +142,7 @@ public class Device extends LuaTable {
             set("make_sub_controller", TRUE);
             final LuaTable devicesTable = devicesArg.checktable();
             set("my_devices", devicesTable);
-            final Devices devices = (Devices) devicesTable;
+            //final Devices devices = (Devices) devicesTable;
             return NIL;
         }
     }
