@@ -154,6 +154,7 @@ public class Network extends LuaTable {
     }
 
     private LuaNil clearNodes() {
+        nextIpIndex = 0;
         nodes.clear();
         links.clear();
         nodeLinks.clear();

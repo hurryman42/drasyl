@@ -6,15 +6,10 @@ local our_devices = {} -- unordered list of all our devices
 local controller_of_devices = {} -- mapping of device to its controller
 --local our_sub_controllers = {} -- unordered list of all our sub-controller(s)
 
--- if the controller of the device is the top-level controller ("us"), then the device.controllerAddress = ""
+-- if the controller of the device is the top-level controller ("us"), then the device.controllerAddress = "."
 
 net = create_network()
 --net:add_node("n1", {ip="10.1.0.42/24"})
-
--- 3 ways to keep & get the (sub-)controller-device-relationship:
---      the devices each know their controller (since creation) --> our solution
---      each sub-controller keeps track of its devices in its network object --> not optimal
---      only the top-level controller keeps track of which device it mapped to which sub-controller --> not really hierarchical, just for lazy implementation
 
 net:set_callback(
     function(my_net, devices) -- set_callback is called every 5000ms
@@ -29,12 +24,12 @@ net:set_callback(
             print("device.controllerAddress: " .. device.controller_address)
             if device.is_sub_controller == true then -- device is sub-controller
                 --table.insert(our_sub_controllers, device)
-                controller_of_devices[device] = ""
-            elseif device.controller_address ~= "" then -- device controlled by sub-controller
+                controller_of_devices[device] = "."
+            elseif device.controller_address ~= "." then -- device controlled by sub-controller
                 controller_of_devices[device] = device.controller_address
-            elseif device.controller_address == "" then -- device controlled by "us" (top-level controller)
+            elseif device.controller_address == "." then -- device controlled by "us" (top-level controller)
                 table.insert(our_devices, device)
-                controller_of_devices[device] = ""
+                controller_of_devices[device] = "."
             end
         end
 
