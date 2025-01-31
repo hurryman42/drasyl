@@ -178,7 +178,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                             final CertificateFactory cf = CertificateFactory.getInstance("X.509");
                             myCert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(myCertString.getBytes()));
 
-                            final String myCertSubjectString = myCert.getSubjectX500Principal().toString(); // TODO: test this!!!
+                            final String myCertSubjectString = myCert.getSubjectX500Principal().toString();
                             int startIndex = myCertSubjectString.indexOf("CN=");
                             if (startIndex != -1) {
                                 startIndex += 3;
