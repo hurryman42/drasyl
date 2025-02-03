@@ -107,11 +107,7 @@ public class SubControllerPolicy extends AbstractPolicy {
             return false;
         }
         final SubControllerPolicy that = (SubControllerPolicy) o;
-        return Objects.equals(address, that.address)
-                && Objects.equals(controller, that.controller)
-                && Objects.equals(devices, that.devices)
-                && Objects.equals(is_sub_controller, that.is_sub_controller)
-                && Objects.equals(subnet, that.subnet);
+        return Objects.equals(address, that.address) && Objects.equals(controller, that.controller) && Objects.equals(devices, that.devices) && Objects.equals(is_sub_controller, that.is_sub_controller) && Objects.equals(subnet, that.subnet);
     }
 
     @Override

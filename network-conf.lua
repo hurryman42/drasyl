@@ -1,5 +1,5 @@
-HIGH_WATERMARK = 10 -- device count for when to offload onto a new sub-controller
-LOW_WATERMARK = 2 -- device count for when to decommission a sub-controller
+HIGH_WATERMARK = 3 -- device count for when to offload onto a new sub-controller
+LOW_WATERMARK = 1 -- device count for when to decommission a sub-controller
 
 -- in the naming scheme, "we" are the top-level controller of this network
 -- if the controller of the device is the top-level controller ("us"), then the device.controllerAddress = ""
@@ -14,6 +14,7 @@ net:set_callback(
     function(my_net, devices) -- set_callback is called every 5000ms
         just_starting = true
         our_devices = {}
+        nr_sub_controllers = 0
         print(inspect(devices))
 
         for id, device in pairs(devices) do
@@ -24,6 +25,7 @@ net:set_callback(
 
             if device.is_sub_controller == true then -- device is sub-controller
                 controller_of_devices[device] = ""
+                nr_sub_controllers = nr_sub_controllers + 1
             elseif device.controller_address ~= "" then -- device controlled by sub-controller
                 controller_of_devices[device] = device.controller_address
             elseif device.controller_address == "" then -- device controlled by "us" (top-level controller)
@@ -44,44 +46,63 @@ net:set_callback(
                 if controller == "" then
                     print(inspect(device) .. " has standard controller")
                 else
-                    print(inspect(device) .. " has controller: " .. controller)
+                    print(inspect(device) .. " has controller: " .. inspect(controller))
                 end
             end
             print("--------------------")
         end
 
-        if #our_devices >= HIGH_WATERMARK then -- sub controller needed
+        -- if the luatable is not an indexed one but rather a map, the # won't work and you would have to count the number of elements manually
+        --nr_our_devices = 0
+        --for _ in pairs(our_devices) do
+        --    nr_our_devices = nr_our_devices + 1
+        --end
+
+        --print(#our_devices)
+        nr_managed_devs = #our_devices + nr_sub_controllers
+        print(nr_managed_devs)
+
+        if nr_managed_devs >= HIGH_WATERMARK then -- sub controller needed
             just_starting = false
             print("controller is preparing to offload...")
 
             -- elect sub controller (for now take simply the first)
             sub_controller = our_devices[1]
+            sub_controller_index = 1
             --sub_controller = elect_sub_controller(devices) -- this java function needs a good score to be calculated
             sub_controller.is_sub_controller = true
+            table.remove(our_devices, sub_controller_index)
+            print("selected sub_controller: " .. inspect(sub_controller))
 
             -- elect devices to be offloaded (for now just take the first n devices)
             devices_to_handover = {}
-            for i = 1, #our_devices - LOW_WATERMARK do
-                devices_to_handover[i] = our_devices[1]
-                controller_of_devices[our_devices[1]] = sub_controller -- this makes the devices_to_handover variable useless, but maybe its needed with a more sophisticated solution
+            loop_limit = nr_managed_devs - LOW_WATERMARK - 1 -- the -1 keeps the new sub_controller out of the calculation
+            print(loop_limit)
+            for i = 1, loop_limit do
+                table.insert(devices_to_handover, our_devices[1])
+                controller_of_devices[our_devices[1]] = sub_controller -- this makes the devices_to_handover variable useless, but maybe it is needed with a more sophisticated solution
                 our_devices[1].controllerAddress = sub_controller
                 table.remove(our_devices, 1)
             end
-            -- devices_to_handover = elect_devices_to_handover(devices, #our_devices - LOW_WATERMARK)
+            -- devices_to_handover = elect_devices_to_handover(devices, nr_managed_devs - LOW_WATERMARK - 1)
+            print("elected devices to offload.")
 
             -- DEBUG printing
-            for i, device in ipairs(our_devices) do print(inspect(device)) end
-            print("-----")
-            for i, device in ipairs(devices_to_handover) do print(inspect(device)) end
-            print("-----")
-            for device, controller in pairs(controller_of_devices) do print(inspect(device) .. " has controller: " .. controller) end
-            print("-----")
+            print("--------------------")
+            for i, device in ipairs(our_devices) do print("our_device: " .. inspect(device)) end
+            print("--------------------")
+            for i, device in ipairs(devices_to_handover) do print("device to handover: " .. inspect(device)) end
+            print("--------------------")
+            for device, controller in pairs(controller_of_devices) do print(inspect(device) .. " has controller: " .. inspect(controller)) end
+            print("--------------------")
 
             -- actually create the sub-controller
             print("controller is offloading...")
-            dev:make_sub_controller(devices_to_handover)
+            print(inspect(sub_controller))
+            print(inspect(devices_to_handover))
+            make_sub_controller(sub_controller, devices_to_handover)
 
-        elseif just_starting == false and #our_devices <= LOW_WATERMARK then -- no sub controller needed anymore, get nodes back
+        elseif nr_managed_devs <= LOW_WATERMARK and just_starting == false then -- no sub controller needed anymore, get nodes back
             print("decommissioning a sub-controller")
 
             -- two options for decommissioning a sub_controller:
@@ -89,7 +110,7 @@ net:set_callback(
             --      CA revokes certificate for sub_controller & nodes timeout
             -- second version probably better as its easier to implement and a repeating check by the devices to their controller is a good idea
 
-            for i, device in ipairs(devices) do
+            for id, device in pairs(devices) do
                 while #our_devices <= LOW_WATERMARK do
                     if device.is_sub_controller == true then
                         sub_controller = device
@@ -113,7 +134,7 @@ net:set_callback(
             end
             just_starting = true
         else
-            print("well, what now?")
+            print("smile and wave")
         end
     end
 )

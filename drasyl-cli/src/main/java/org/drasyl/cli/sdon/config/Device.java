@@ -111,9 +111,8 @@ public class Device extends LuaTable {
 
     public Set<Policy> createPolicies(String subnet) {
         final Set<Policy> policies = new HashSet<>();
-        if (get("make_sub_controller") == TRUE) {
-            LuaTable devs = get("my_devices").checktable();
-            final Devices myDevices = (Devices) devs;
+        if (isSubController()) {
+            final Devices myDevices = (Devices) get("my_devices").checktable();
             final Collection<Device> myDeviceCollection = myDevices.getDevices();
             final Set<DrasylAddress> myDeviceAddresses = new HashSet<>();
             for (Device device : myDeviceCollection) {
@@ -141,13 +140,17 @@ public class Device extends LuaTable {
         return get("is_sub_controller") == TRUE;
     }
 
+    public void setDevices(Devices devices) {
+        set("my_devices", devices);
+    }
+
     static class MakeSubControllerFunction extends TwoArgFunction {
         @Override
         public LuaValue call(final LuaValue subControllerArg, final LuaValue devicesArg) {
-            set("make_sub_controller", TRUE);
-            final LuaTable devicesTable = devicesArg.checktable();
-            set("my_devices", devicesTable);
-            //final Devices devices = (Devices) devicesTable;
+            final Device sub_controller = (Device) subControllerArg;
+            sub_controller.setSubController();
+            final Devices devices = (Devices) devicesArg.checktable();
+            sub_controller.setDevices(devices);
             return NIL;
         }
     }

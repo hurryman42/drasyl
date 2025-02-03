@@ -29,8 +29,6 @@ import org.luaj.vm2.LuaValue;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.HashMap;
-import java.util.Map;
 
 public class Devices extends LuaTable {
     public Devices() {
