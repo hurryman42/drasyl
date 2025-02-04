@@ -27,6 +27,7 @@ import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 import org.luaj.vm2.lib.OneArgFunction;
 import org.luaj.vm2.lib.TwoArgFunction;
+import org.luaj.vm2.lib.VarArgFunction;
 
 import java.util.Collection;
 import static java.util.Objects.requireNonNull;
@@ -51,6 +52,7 @@ public class ControllerLib extends TwoArgFunction {
         env.set("get_network", new GetNetworkFunction());
         env.set("elect_sub_controller", new ElectSubControllerFunction());
         env.set("elect_devices_to_handover", new ElectDevicesToHandoverFunction());
+        env.set("create_devices", new CreateDevicesFunction());
         return library;
     }
 
@@ -130,6 +132,24 @@ public class ControllerLib extends TwoArgFunction {
                 devicesToHandover.add(device);
             }
             return devicesToHandover;
+        }
+    }
+
+    static class CreateDevicesFunction extends VarArgFunction {
+        @Override
+        public Devices call(final LuaValue devicesArg) {
+            final Devices devices = new Devices();
+            final LuaTable devicesTable = devicesArg.checktable();
+            // TODO: check first, whether the array or the hash part (or both) of the LuaTable are filled
+            for (int i = 1; i <= devicesTable.length(); i++) {
+                try {
+                    Device device = (Device) devicesTable.get(i);
+                    devices.addDevice(device);
+                } catch (Exception e) {
+                    System.out.println("Element of Table was not of type Device.");
+                }
+            }
+            return devices;
         }
     }
 }

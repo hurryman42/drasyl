@@ -59,4 +59,8 @@ public class Devices extends LuaTable {
         }
         return devices;
     }
+
+    public void addDevice(final Device device) {
+        set(device.address().toString(), device);
+    }
 }

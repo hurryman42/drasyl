@@ -147,10 +147,16 @@ public class Device extends LuaTable {
     static class MakeSubControllerFunction extends TwoArgFunction {
         @Override
         public LuaValue call(final LuaValue subControllerArg, final LuaValue devicesArg) {
-            final Device sub_controller = (Device) subControllerArg;
-            sub_controller.setSubController();
-            final Devices devices = (Devices) devicesArg.checktable();
-            sub_controller.setDevices(devices);
+            final LuaTable devTable = devicesArg.checktable();
+            final LuaTable subControllerTable = subControllerArg.checktable();
+            try {
+                final Device subController = (Device) subControllerTable;
+                Devices myDevices = (Devices) devTable;
+                subController.setSubController();
+                subController.setDevices(myDevices);
+            } catch (ClassCastException e) {
+                System.out.println("The given LuaTables are not of Device and Devices type, instead " + subControllerTable.getClass() + "and" + devTable.getClass());
+            }
             return NIL;
         }
     }
