@@ -59,6 +59,8 @@ public class NetworkNode extends LuaTable {
         // name
         set("name", name);
 
+        // TODO: check if ip address is in subnet that the controller is allowed to manage by its certificate
+
         // ip
         LuaValue ip = params.get("ip");
         if (ip == NIL) {

@@ -108,7 +108,7 @@ public class SignCertificate {
             }
             final String subnetAddress = csrSubjectString.substring(startIndex, endIndex).trim();
             System.out.println(subnetAddress);
-            if (!"10.1.0.0/24".equals(subnetAddress)) {
+            if (!"10.0.0.42/8".equals(subnetAddress)) {
                 throw new CertificateException("Wrong subnet address in CSR!");
             }
         }

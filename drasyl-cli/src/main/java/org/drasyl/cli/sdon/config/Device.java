@@ -92,8 +92,14 @@ public class Device extends LuaTable {
         return IdentityPublicKey.of(get("address").tojstring());
     }
 
-    public DrasylAddress controllerAddress() {
-        return IdentityPublicKey.of(get("controllerAddress").tojstring());
+    public DrasylAddress controllerAddress(String fallbackControllerAddress) {
+        String controllerAddressString = get("controllerAddress").tojstring();
+        if (controllerAddressString.isEmpty() || controllerAddressString.equals("nil")) {
+            return IdentityPublicKey.of(fallbackControllerAddress);
+        }
+        else {
+            return IdentityPublicKey.of(controllerAddressString);
+        }
     }
 
     public void setFacts(final Map<String, Object> facts) {
@@ -109,7 +115,7 @@ public class Device extends LuaTable {
         set("policies", table);
     }
 
-    public Set<Policy> createPolicies(String subnet) {
+    public Set<Policy> createPolicies(String subnet, String fallbackControllerAddress) {
         final Set<Policy> policies = new HashSet<>();
         if (isSubController()) {
             final Devices myDevices = (Devices) get("my_devices").checktable();
@@ -118,7 +124,7 @@ public class Device extends LuaTable {
             for (Device device : myDeviceCollection) {
                 myDeviceAddresses.add(device.address());
             }
-            final Policy controllerPolicy = new SubControllerPolicy(address(), controllerAddress(), myDeviceAddresses, isSubController(), subnet);
+            final Policy controllerPolicy = new SubControllerPolicy(address(), controllerAddress(fallbackControllerAddress), myDeviceAddresses, isSubController(), subnet);
             policies.add(controllerPolicy);
         }
         return policies;
@@ -151,10 +157,11 @@ public class Device extends LuaTable {
             final LuaTable subControllerTable = subControllerArg.checktable();
             try {
                 final Device subController = (Device) subControllerTable;
-                Devices myDevices = (Devices) devTable;
+                final Devices myDevices = (Devices) devTable;
                 subController.setSubController();
                 subController.setDevices(myDevices);
-            } catch (ClassCastException e) {
+            }
+            catch (ClassCastException e) {
                 System.out.println("The given LuaTables are not of Device and Devices type, instead " + subControllerTable.getClass() + "and" + devTable.getClass());
             }
             return NIL;

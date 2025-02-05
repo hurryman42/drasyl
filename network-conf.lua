@@ -8,7 +8,9 @@ local our_devices = {} -- unordered list of all our devices
 local controller_of_devices = {} -- mapping of device to its controller
 
 net = create_network()
-net:add_node("n1", {ip="10.1.0.42/8"})
+net:add_node("n1", {ip="10.1.0.1/24"})
+net:add_node("n2", {ip="10.2.0.2/24"})
+net:add_node("n3", {ip="10.3.0.3/24"})
 
 net:set_callback(
     function(my_net, devices) -- set_callback is called every 5000ms

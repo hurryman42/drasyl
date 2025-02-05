@@ -160,10 +160,11 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
             LOG.debug("Received from `{}`: {}", sender, msg.toString().replace("\n", ""));
 
             if (sender.equals(controller) && msg instanceof ControllerHello) {
-                final List<String> certificates = ((ControllerHello) msg).certificates();
+                final ControllerHello controllerHello = (ControllerHello) msg;
+                final List<String> certificates = controllerHello.certificates();
                 //certificates.replaceAll(s -> s.replace("\n", ""));
 
-                if (!certificates.isEmpty() && !((ControllerHello) msg).policies().isEmpty()) {
+                if (!certificates.isEmpty() && !controllerHello.policies().isEmpty()) {
                     // load rootCertificate from file & check whether it equals the last certificate in the message
                     final String rootCertFilePath = "cacert.crt"; // TODO: make this more dynamic (command inputs?)
                     final String rootCertString = Files.readString(Path.of(rootCertFilePath));
@@ -204,7 +205,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                     final byte[] subnetAddressBytes = subnetAddress.getAddress();
                     final short subnetNetmask = Short.parseShort(subnetSplit[1]);
 
-                    final Set<Policy> policies = ((ControllerHello) msg).policies();
+                    final Set<Policy> policies = controllerHello.policies();
                     for (Policy policy : policies) {
                         if (policy instanceof TunPolicy) {
                             final TunPolicy tunPolicy = (TunPolicy) policy;
@@ -299,10 +300,10 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                         }
                     }
                 }
-                else if (certificates.isEmpty() && !((ControllerHello) msg).policies().isEmpty()) {
+                else if (certificates.isEmpty() && !controllerHello.policies().isEmpty()) {
                     throw new CertificateException("No certificates although there are policies.");
                 }
-                else if (!certificates.isEmpty() && ((ControllerHello) msg).policies().isEmpty()) {
+                else if (!certificates.isEmpty() && controllerHello.policies().isEmpty()) {
                     final String myNewCertificateString = certificates.get(0);
                     final CertificateFactory cf = CertificateFactory.getInstance("X.509");
                     certificate = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(myNewCertificateString.getBytes()));
@@ -316,7 +317,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                 state = JOINED;
 
                 // extract policies from the certificate?
-                final Set<Policy> newPolicies = ((ControllerHello) msg).policies();
+                final Set<Policy> newPolicies = controllerHello.policies();
                 LOG.trace("Got new policies from controller: {}", newPolicies);
 
                 // remove old policies

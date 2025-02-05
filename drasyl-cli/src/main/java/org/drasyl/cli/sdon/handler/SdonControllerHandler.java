@@ -50,6 +50,7 @@ import org.drasyl.cli.sdon.message.SdonMessage;
 import org.drasyl.identity.DrasylAddress;
 import org.drasyl.util.logging.Logger;
 import org.drasyl.util.logging.LoggerFactory;
+import org.drasyl.util.network.Subnet;
 import org.luaj.vm2.LuaString;
 
 import java.io.ByteArrayInputStream;
@@ -57,7 +58,6 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.io.StringReader;
 import java.math.BigInteger;
-import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -67,6 +67,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Base64;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -88,7 +89,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
     private final PrivateKey privateKey;
     private State state;
     private X509Certificate myCert;
-    private String mySubnet;
+    private Subnet mySubnet;
     private Map<DrasylAddress, String> subControllerSubnets; // is this the best way to keep track of the sub-controllers here?
 
     SdonControllerHandler(final PrintStream out,
@@ -101,6 +102,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
         this.devices = requireNonNull(devices);
         this.publicKey = requireNonNull(publicKey);
         this.privateKey = requireNonNull(privateKey);
+        this.subControllerSubnets = new HashMap<>();
     }
 
     public SdonControllerHandler(final PrintStream out,
@@ -178,7 +180,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                             final CertificateFactory cf = CertificateFactory.getInstance("X.509");
                             myCert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(myCertString.getBytes()));
 
-                            final String myCertSubjectString = myCert.getSubjectX500Principal().toString();
+                            String myCertSubjectString = myCert.getSubjectX500Principal().toString();
                             int startIndex = myCertSubjectString.indexOf("CN=");
                             if (startIndex != -1) {
                                 startIndex += 3;
@@ -186,17 +188,15 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                                 if (endIndex == -1) {
                                     endIndex = myCertSubjectString.length();
                                 }
-                                mySubnet = myCertSubjectString.substring(startIndex, endIndex).trim();
-
-                                final String[] mySubnetSplit = mySubnet.split("/");
-                                final InetAddress address = InetAddress.getByName(mySubnetSplit[0]);
-                                final short netmask = Short.parseShort(mySubnetSplit[1]);
+                                myCertSubjectString = myCertSubjectString.substring(startIndex, endIndex).trim();
+                                mySubnet = new Subnet(myCertSubjectString);
 
                                 // the smallerSubnet String is always created but only when a devicePolicy with this subnet is created, it is added to subControllerSubnets
-                                final String smallerSubnet = address.toString() + "/" + (netmask + 8); // + 8 probably not the best always
-                                final Set<Policy> devicePolicies = device.createPolicies(smallerSubnet);
+                                final String smallerSubnetString = mySubnet.addressString() + "/" + (mySubnet.netmaskLength() + 8); // + 8 probably not the best always
+
+                                final Set<Policy> devicePolicies = device.createPolicies(smallerSubnetString, ctx.channel().localAddress().toString());
                                 if (!devicePolicies.isEmpty()) {
-                                    subControllerSubnets.put(device.address(), smallerSubnet);
+                                    subControllerSubnets.put(device.address(), smallerSubnetString);
                                     policies.addAll(devicePolicies);
                                 }
                             }

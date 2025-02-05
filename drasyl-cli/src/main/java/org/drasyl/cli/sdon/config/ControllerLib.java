@@ -143,9 +143,10 @@ public class ControllerLib extends TwoArgFunction {
             // TODO: check first, whether the array or the hash part (or both) of the LuaTable are filled
             for (int i = 1; i <= devicesTable.length(); i++) {
                 try {
-                    Device device = (Device) devicesTable.get(i);
+                    final Device device = (Device) devicesTable.get(i);
                     devices.addDevice(device);
-                } catch (Exception e) {
+                }
+                catch (Exception e) {
                     System.out.println("Element of Table was not of type Device.");
                 }
             }

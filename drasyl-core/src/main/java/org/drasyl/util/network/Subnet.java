@@ -27,7 +27,7 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 
 /**
- * Represents an IP range..
+ * Represents an IP range.
  */
 public class Subnet {
     private final InetAddress address;
@@ -67,6 +67,10 @@ public class Subnet {
 
     public InetAddress address() {
         return address;
+    }
+
+    public String addressString() {
+        return address.getHostAddress();
     }
 
     public int netmaskLength() {

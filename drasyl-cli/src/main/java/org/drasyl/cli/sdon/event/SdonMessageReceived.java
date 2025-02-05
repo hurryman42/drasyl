@@ -37,7 +37,7 @@ public class SdonMessageReceived {
 
     @Override
     public String toString() {
-        return "SdoMessageReceived{" +
+        return "SdonMessageReceived{" +
                 "address=" + address +
                 ", msg=" + msg +
                 '}';
