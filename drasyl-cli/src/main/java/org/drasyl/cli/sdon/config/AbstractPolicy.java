@@ -35,11 +35,6 @@ import static org.drasyl.cli.sdon.config.AbstractPolicy.PolicyState.PRESENT;
 import static org.luaj.vm2.LuaValue.NIL;
 import static org.luaj.vm2.LuaValue.tableOf;
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME)
-@JsonSubTypes({
-        @Type(TunPolicy.class),
-        @Type(LinkPolicy.class),
-})
 abstract class AbstractPolicy implements Policy {
     protected PolicyState state;
 

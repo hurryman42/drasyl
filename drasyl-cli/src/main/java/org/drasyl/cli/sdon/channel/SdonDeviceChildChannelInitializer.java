@@ -23,6 +23,8 @@ package org.drasyl.cli.sdon.channel;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
+import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
+import io.netty.handler.codec.LengthFieldPrepender;
 import org.drasyl.channel.ConnectionChannelInitializer;
 import org.drasyl.channel.DrasylChannel;
 import org.drasyl.cli.sdon.handler.SdonMessageChildHandler;
@@ -76,6 +78,10 @@ public class SdonDeviceChildChannelInitializer extends ConnectionChannelInitiali
         super.initChannel(ch);
 
         final ChannelPipeline p = ch.pipeline();
+
+        p.addLast(new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4));
+        p.addLast(new LengthFieldPrepender(4));
+
         p.addLast(new JacksonCodec<>(OBJECT_MAPPER, SdonMessage.class));
         p.addLast(new SdonMessageChildHandler());
     }

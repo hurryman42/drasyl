@@ -83,8 +83,8 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
     private static final int DEVICE_HELLO_INTERVAL = 5_000; // every 5 seconds
     private final PrintStream out;
     private final IdentityPublicKey controller;
-    private final PublicKey publicKey;
-    private final PrivateKey privateKey;
+    public final PublicKey publicKey;
+    public final PrivateKey privateKey;
     private X509Certificate certificate;
     private final Map<String, Object> facts;
     State state;
@@ -245,11 +245,12 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                         else if (policy instanceof SubControllerPolicy) {
                             final SubControllerPolicy subControllerPolicy = (SubControllerPolicy) policy;
                             final Boolean isSubController = subControllerPolicy.is_sub_controller();
-                            final String subControllerSubnet = subControllerPolicy.subnet();
                             final DrasylAddress myAddress = subControllerPolicy.address();
 
+                            /*
+                            // check whether I have the certificate already, not via this weird state
                             if (!isSubController) { // start SubController creation process: create and send a DeviceCSR
-                                final String csrAsString = createCSR(publicKey, privateKey, subControllerSubnet);
+                                final String csrAsString = createCSR(publicKey, privateKey, subControllerPolicy.subnet());
                                 final DeviceCSR subControllerCSR = new DeviceCSR(csrAsString);
                                 out.println("Generated DeviceCSR message. Sending to controller now.");
 
@@ -263,33 +264,32 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                                         throw (Exception) future.cause();
                                     }
                                 });
-                            }
-                            else { // the device is a sub-controller --> it receives SubControllerPolicies & sends ControlledPolicies to its devices
-                                final Set<DrasylAddress> myDeviceAddresses = subControllerPolicy.devices();
-                                final Devices myDevices = new Devices();
+                            }*/
+                            // the device is a sub-controller --> it receives SubControllerPolicies & sends ControlledPolicies to its devices
+                            final Set<DrasylAddress> myDeviceAddresses = subControllerPolicy.devices();
+                            final Devices myDevices = new Devices();
 
-                                // maybe individual policy type created by that sub-controller and only send by it (metaprogramming)
-                                final ControlledPolicy controlledPolicy = new ControlledPolicy(myAddress);
+                            // maybe individual policy type created by that sub-controller and only send by it (metaprogramming)
+                            final ControlledPolicy controlledPolicy = new ControlledPolicy(myAddress);
 
-                                final Set<Policy> devicePolicies = Set.of(controlledPolicy); // TODO: needs additional TunPolicy and not only ControlledPolicy?
-                                final DeviceHello message = new DeviceHello(facts, devicePolicies);
+                            final Set<Policy> devicePolicies = Set.of(controlledPolicy); // TODO: needs additional TunPolicy and not only ControlledPolicy?
+                            final DeviceHello message = new DeviceHello(facts, devicePolicies);
 
-                                for (DrasylAddress deviceAddress : myDeviceAddresses) {
-                                    // add this Device to the Devices Object
-                                    final Device thisDevice = new Device(deviceAddress, myAddress);
-                                    myDevices.add(thisDevice);
+                            for (DrasylAddress deviceAddress : myDeviceAddresses) {
+                                // add this Device to the Devices Object
+                                final Device thisDevice = new Device(deviceAddress, myAddress);
+                                myDevices.addDevice(thisDevice);
 
-                                    // send the ControlledPolicy via a DeviceHello to the device
-                                    ((DrasylServerChannel) ctx.channel()).serve(deviceAddress).addListener((ChannelFutureListener) future -> {
-                                        if (future.isSuccess()) {
-                                            final Channel channelToController = future.channel();
-                                            channelToController.writeAndFlush(message).addListener(FIRE_EXCEPTION_ON_FAILURE);
-                                        }
-                                        else {
-                                            throw (Exception) future.cause();
-                                        }
-                                    });
-                                }
+                                // send the ControlledPolicy via a DeviceHello to the device
+                                ((DrasylServerChannel) ctx.channel()).serve(deviceAddress).addListener((ChannelFutureListener) future -> {
+                                    if (future.isSuccess()) {
+                                        final Channel channelToController = future.channel();
+                                        channelToController.writeAndFlush(message).addListener(FIRE_EXCEPTION_ON_FAILURE);
+                                    }
+                                    else {
+                                        throw (Exception) future.cause();
+                                    }
+                                });
                             }
                         }
                         else if (policy instanceof ControlledPolicy) {
@@ -307,6 +307,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                     final String myNewCertificateString = certificates.get(0);
                     final CertificateFactory cf = CertificateFactory.getInstance("X.509");
                     certificate = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(myNewCertificateString.getBytes()));
+                    // TODO: set isSubController of the device that is sub-controller to true
                     out.println("Received certificate from controller.");
                 }
 
@@ -364,7 +365,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
     private static String convertCSRToPemString(final PKCS10CertificationRequest csr) throws IOException {
         final Base64.Encoder encoder = Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.UTF_8));
         final byte[] csrBytes = csr.getEncoded();
-        return "-----BEGIN SIGNING REQUEST-----" + "\n" + encoder.encodeToString(csrBytes) + "\n" + "-----END SIGNING REQUEST-----";
+        return "-----BEGIN CERTIFICATE REQUEST-----" + "\n" + encoder.encodeToString(csrBytes) + "\n" + "-----END CERTIFICATE REQUEST-----";
     }
 
     enum State {

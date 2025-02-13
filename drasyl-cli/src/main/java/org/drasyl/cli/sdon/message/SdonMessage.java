@@ -30,6 +30,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
 @JsonSubTypes({
         @Type(value = ControllerHello.class),
         @Type(value = DeviceHello.class),
+        @Type(value = DeviceCSR.class),
 })
 public interface SdonMessage {
 }

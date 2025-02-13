@@ -22,8 +22,18 @@
 package org.drasyl.cli.sdon.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import io.netty.channel.ChannelPipeline;
 import org.luaj.vm2.LuaValue;
+
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME)
+@JsonSubTypes({
+        @JsonSubTypes.Type(TunPolicy.class),
+        @JsonSubTypes.Type(LinkPolicy.class),
+        @JsonSubTypes.Type(SubControllerPolicy.class),
+        @JsonSubTypes.Type(ControlledPolicy.class),
+})
 
 public interface Policy {
     @JsonIgnore

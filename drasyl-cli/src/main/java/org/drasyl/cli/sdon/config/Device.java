@@ -43,6 +43,7 @@ public class Device extends LuaTable {
         set("facts", tableOf());
         set("policies", tableOf());
         set("is_sub_controller", FALSE);
+        set("sub_controller_instantiation", FALSE);
         set("my_devices", tableOf());
         set("controller_address", LuaValue.valueOf(controllerAddress.toString()));
         set("make_sub_controller", new MakeSubControllerFunction());
@@ -54,6 +55,7 @@ public class Device extends LuaTable {
         set("facts", tableOf());
         set("policies", tableOf());
         set("is_sub_controller", FALSE);
+        set("sub_controller_instantiation", FALSE);
         set("my_devices", tableOf());
         set("controller_address", LuaValue.valueOf(""));
         set("make_sub_controller", new MakeSubControllerFunction());
@@ -67,6 +69,7 @@ public class Device extends LuaTable {
         stringTable.set("facts", get("facts"));
         stringTable.set("policies", get("policies"));
         stringTable.set("is_sub_controller", get("is_sub_controller"));
+        stringTable.set("sub_controller_instantiation", get("sub_controller_instantiation"));
         stringTable.set("my_devices", get("my_devices"));
         stringTable.set("controllerAddress", get("controllerAddress"));
         return "Device" + LuaHelper.toString(stringTable);
@@ -93,8 +96,8 @@ public class Device extends LuaTable {
     }
 
     public DrasylAddress controllerAddress(String fallbackControllerAddress) {
-        String controllerAddressString = get("controllerAddress").tojstring();
-        if (controllerAddressString.isEmpty() || controllerAddressString.equals("nil")) {
+        final String controllerAddressString = get("controllerAddress").tojstring();
+        if (controllerAddressString.isEmpty() || "nil".equals(controllerAddressString)) {
             return IdentityPublicKey.of(fallbackControllerAddress);
         }
         else {
@@ -117,13 +120,14 @@ public class Device extends LuaTable {
 
     public Set<Policy> createPolicies(String subnet, String fallbackControllerAddress) {
         final Set<Policy> policies = new HashSet<>();
-        if (isSubController()) {
+        if (isSubController() || shouldSubControllerInstantiation()) {
             final Devices myDevices = (Devices) get("my_devices").checktable();
             final Collection<Device> myDeviceCollection = myDevices.getDevices();
             final Set<DrasylAddress> myDeviceAddresses = new HashSet<>();
             for (Device device : myDeviceCollection) {
                 myDeviceAddresses.add(device.address());
             }
+            boolean testIsSubController = isSubController();
             final Policy controllerPolicy = new SubControllerPolicy(address(), controllerAddress(fallbackControllerAddress), myDeviceAddresses, isSubController(), subnet);
             policies.add(controllerPolicy);
         }
@@ -143,7 +147,15 @@ public class Device extends LuaTable {
     }
 
     public boolean isSubController() {
-        return get("is_sub_controller") == TRUE;
+        return (get("is_sub_controller") == TRUE);
+    }
+
+    public void setSubControllerInstantiation() {
+        set("sub_controller_instantiation", TRUE);
+    }
+
+    public boolean shouldSubControllerInstantiation() {
+        return get("sub_controller_instantiation") == TRUE;
     }
 
     public void setDevices(Devices devices) {
@@ -158,7 +170,8 @@ public class Device extends LuaTable {
             try {
                 final Device subController = (Device) subControllerTable;
                 final Devices myDevices = (Devices) devTable;
-                subController.setSubController();
+                //subController.setSubController();
+                subController.setSubControllerInstantiation();
                 subController.setDevices(myDevices);
             }
             catch (ClassCastException e) {

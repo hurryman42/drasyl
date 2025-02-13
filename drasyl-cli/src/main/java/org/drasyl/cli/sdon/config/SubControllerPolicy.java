@@ -21,6 +21,7 @@
  */
 package org.drasyl.cli.sdon.config;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.netty.channel.ChannelPipeline;
@@ -39,8 +40,11 @@ public class SubControllerPolicy extends AbstractPolicy {
     private DrasylAddress controller;
     private Set<DrasylAddress> devices;
     private Boolean is_sub_controller;
-    private String subnet; // this as a String? not as an actual address with netmask?
+    private String subnet; // TODO: this as a String? not as an actual address with netmask? there is a class for a subnet address! use it here?
 
+    // TODO: maybe add a maximum number of devices that the sub-controller is allowed to manage? Or add that as a "permission" in the certificate?
+
+    @JsonCreator
     public SubControllerPolicy(@JsonProperty("address") final DrasylAddress address,
                                @JsonProperty("controller") final DrasylAddress controller,
                                @JsonProperty("devices") final Set<DrasylAddress> devices,
@@ -117,11 +121,11 @@ public class SubControllerPolicy extends AbstractPolicy {
 
     @Override
     public String toString() {
-        return "DevicePolicy{" +
+        return "SubControllerPolicy{" +
                 "address=" + address +
                 ", controller=" + controller +
                 ", devices=" + devices +
-                ", sub-controller" + is_sub_controller +
+                ", sub-controller=" + is_sub_controller +
                 ", state=" + state +
                 ", subnet=" + subnet +
                 '}';

@@ -68,7 +68,7 @@ net:set_callback(
             sub_controller = our_devices[1]
             sub_controller_index = 1
             --sub_controller = elect_sub_controller(devices) -- this java function needs a good score to be calculated
-            sub_controller.is_sub_controller = true
+            --sub_controller.is_sub_controller = true
             table.remove(our_devices, sub_controller_index)
             print("selected sub_controller: " .. inspect(sub_controller)) -- DEBUG printing
 

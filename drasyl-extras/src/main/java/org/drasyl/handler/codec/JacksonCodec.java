@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufOutputStream;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageCodec;
 import org.drasyl.util.ThrowingBiConsumer;
@@ -88,8 +89,14 @@ public class JacksonCodec<T> extends ByteToMessageCodec<T> {
     protected void decode(final ChannelHandlerContext ctx,
                           final ByteBuf in,
                           final List<Object> out) throws IOException {
+        in.markReaderIndex();
         try (final InputStream inputStream = new ByteBufInputStream(in)) {
             out.add(jacksonReader.apply(inputStream, clazz));
+        }
+        catch (final Exception e) {
+            in.resetReaderIndex();
+            System.out.println(new String(ByteBufUtil.getBytes(in)));
+            throw e;
         }
     }
 }

@@ -21,6 +21,7 @@
  */
 package org.drasyl.cli.sdon.config;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.netty.channel.ChannelPipeline;
@@ -39,6 +40,7 @@ public class ControlledPolicy extends AbstractPolicy {
     public static final String HANDLER_NAME = StringUtil.simpleClassName(ControlledPolicy.class);
     private DrasylAddress controller;
 
+    @JsonCreator
     public ControlledPolicy(@JsonProperty("controller") final DrasylAddress controller) {
         this.controller = controller;
     }
@@ -84,7 +86,7 @@ public class ControlledPolicy extends AbstractPolicy {
 
     @Override
     public String toString() {
-        return "DevicePolicy{" +
+        return "ControlledPolicy{" +
                 ", controller=" + controller +
                 ", state=" + state +
                 '}';

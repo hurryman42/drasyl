@@ -44,8 +44,8 @@ import java.security.Security;
 import java.util.Base64;
 
 public class CreateCSR {
-    public static final String BEGIN_CSR = "-----BEGIN SIGNING REQUEST-----";
-    public static final String END_CSR = "-----END SIGNING REQUEST-----";
+    public static final String BEGIN_CSR = "-----BEGIN CERTIFICATE REQUEST-----";
+    public static final String END_CSR = "-----END CERTIFICATE REQUEST-----";
 
     /**
      * given an ed25519 keypair and a subnet address it creates a CSR for that subnet

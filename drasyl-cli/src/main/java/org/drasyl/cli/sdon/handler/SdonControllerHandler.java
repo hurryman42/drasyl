@@ -136,7 +136,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
             ctx.executor().scheduleAtFixedRate(() -> {
                 try {
                     // call callback
-                    network.callCallback(devices);
+                    network.callCallback(devices); // TODO: add permissions of the controller? (what subnet it controls)
 
                     // do matchmaking
                     final Set<Device> assignedDevices = new HashSet<>();
@@ -233,7 +233,8 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
         if (evt instanceof SdonMessageReceived) {
             final DrasylAddress sender = ((SdonMessageReceived) evt).address();
             final SdonMessage msg = ((SdonMessageReceived) evt).msg();
-            LOG.trace("Received from `{}`: {}`", sender, msg);
+            //LOG.trace("Received from `{}`: {}`", sender, msg);
+            LOG.debug("Received from `{}`: {}`", sender, msg.toString().replace("\n", ""));
 
             if (msg instanceof DeviceHello) {
                 final DeviceHello deviceHello = (DeviceHello) msg;
@@ -299,7 +300,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                 // create certificate builder (subject taken from CSR)
                 final X509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(myCert, serialNumber, notBefore, notAfter, csrSubject, csrPublicKey);
                 // create a content signer
-                final ContentSigner signer = new JcaContentSignerBuilder("Ed25519").setProvider("BC").build(privateKey);
+                final ContentSigner signer = new JcaContentSignerBuilder("Ed25519").build(privateKey);
                 // build the certificate
                 final X509Certificate certificate = new JcaX509CertificateConverter().getCertificate(certBuilder.build(signer));
 
@@ -307,10 +308,13 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                 final List<String> certificates = List.of(convertCertToPem(certificate));
                 final ControllerHello response = new ControllerHello(policies, certificates);
 
+                Device subController = devices.getOrCreateDevice(sender);
+                subController.setSubController();
+
                 out.println("Generated ControllerHello response. Now sending to Device.");
 
                 final DrasylChannel channel = ((DrasylServerChannel) ctx.channel()).getChannels().get(sender);
-                LOG.debug("Send {} to {}.", response, sender);
+                LOG.debug("Send {} to {}.", response.toString().replace("\n", ""), sender);
                 channel.writeAndFlush(response).addListener(FIRE_EXCEPTION_ON_FAILURE);
             }
         }
@@ -322,7 +326,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
     private static String convertCertToPem(final X509Certificate certificate) throws CertificateEncodingException, IOException {
         final Base64.Encoder encoder = Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.UTF_8));
         final byte[] cert = certificate.getEncoded();
-        return "-----END CERTIFICATE-----" + "\n" + encoder.encodeToString(cert) + "\n" + "-----END PRIVATE KEY-----";
+        return "-----BEGIN CERTIFICATE-----" + "\n" + encoder.encodeToString(cert) + "\n" + "-----END CERTIFICATE-----";
     }
 
     enum State {

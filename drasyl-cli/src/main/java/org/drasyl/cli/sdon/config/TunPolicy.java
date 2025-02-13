@@ -22,6 +22,7 @@
 
 package org.drasyl.cli.sdon.config;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -56,6 +57,7 @@ public class TunPolicy extends AbstractPolicy {
     private final short netmask;
     private final Map<InetAddress, DrasylAddress> mapping;
 
+    @JsonCreator
     public TunPolicy(@JsonProperty("address") final InetAddress address,
                      @JsonProperty("netmask") final short netmask,
                      @JsonProperty("mapping") final Map<InetAddress, DrasylAddress> mapping) {
@@ -81,12 +83,12 @@ public class TunPolicy extends AbstractPolicy {
     }
 
     public void addPolicy(final ChannelPipeline pipeline) {
-        pipeline.addLast(HANDLER_NAME, new TunPolicyHandler(this));
+        //pipeline.addLast(HANDLER_NAME, new TunPolicyHandler(this));
     }
 
     @Override
     public void removePolicy(final ChannelPipeline pipeline) {
-        pipeline.remove(HANDLER_NAME);
+        //pipeline.remove(HANDLER_NAME);
     }
 
     @Override

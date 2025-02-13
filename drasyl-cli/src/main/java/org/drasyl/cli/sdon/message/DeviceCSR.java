@@ -34,7 +34,7 @@ public class DeviceCSR implements SdonMessage {
     private final String csr;
 
     @JsonCreator
-    public DeviceCSR(@JsonProperty final String csr) {
+    public DeviceCSR(@JsonProperty("csr") final String csr) {
         this.csr = requireNonNull(csr);
     }
 
