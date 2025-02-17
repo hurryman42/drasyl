@@ -23,6 +23,7 @@ package org.drasyl.cli.sdon.config;
 
 import org.drasyl.cli.util.LuaHelper;
 import org.drasyl.identity.DrasylAddress;
+import org.drasyl.identity.IdentityPublicKey;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 
@@ -32,6 +33,12 @@ import java.util.Set;
 
 public class Devices extends LuaTable {
     public Devices() {
+    }
+
+    public Devices(LuaTable devices) {
+        for (int i=1; i<=devices.length(); i++) {
+            getOrCreateDevice(IdentityPublicKey.of(devices.get(i).tojstring()));
+        }
     }
 
     @Override

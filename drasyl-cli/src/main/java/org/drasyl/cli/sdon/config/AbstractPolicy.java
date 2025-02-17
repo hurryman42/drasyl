@@ -22,9 +22,6 @@
 package org.drasyl.cli.sdon.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonSubTypes;
-import com.fasterxml.jackson.annotation.JsonSubTypes.Type;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import io.netty.util.internal.StringUtil;
 import org.luaj.vm2.LuaString;
 import org.luaj.vm2.LuaTable;

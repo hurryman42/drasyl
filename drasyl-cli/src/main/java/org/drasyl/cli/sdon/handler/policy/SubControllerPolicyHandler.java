@@ -35,16 +35,23 @@ import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
 import org.drasyl.channel.DrasylServerChannel;
 import org.drasyl.cli.sdon.config.SubControllerPolicy;
 import org.drasyl.cli.sdon.handler.SdonDeviceHandler;
-import org.drasyl.cli.sdon.message.DeviceCSR;
+import org.drasyl.cli.sdon.message.DeviceHello;
 import org.drasyl.util.logging.Logger;
 import org.drasyl.util.logging.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Security;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 import static io.netty.channel.ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE;
 import static java.util.Objects.requireNonNull;
@@ -58,22 +65,31 @@ public class SubControllerPolicyHandler extends ChannelInboundHandlerAdapter {
     }
 
     @Override
-    public void handlerAdded(final ChannelHandlerContext ctx) throws IOException, OperatorCreationException {
-        SdonDeviceHandler deviceHandler = ctx.pipeline().get(SdonDeviceHandler.class);
-        final String csrAsString = createCSR(deviceHandler.publicKey, deviceHandler.privateKey, policy.subnet());
-        final DeviceCSR subControllerCSR = new DeviceCSR(csrAsString);
-        System.out.println("Generated DeviceCSR message. Sending to controller now.");
+    public void handlerAdded(final ChannelHandlerContext ctx) throws IOException, OperatorCreationException, CertificateException {
+        final SdonDeviceHandler deviceHandler = ctx.pipeline().get(SdonDeviceHandler.class);
 
-        // send the CSR message
-        ((DrasylServerChannel) ctx.channel()).serve(policy.controller()).addListener((ChannelFutureListener) future -> {
-            if (future.isSuccess()) {
-                final Channel channelToController = future.channel();
-                channelToController.writeAndFlush(subControllerCSR).addListener(FIRE_EXCEPTION_ON_FAILURE);
-            }
-            else {
-                throw (Exception) future.cause();
-            }
-        });
+        final String myNewCertificateString = deviceHandler.myCertificateStrings.get(0);
+        final CertificateFactory cf = CertificateFactory.getInstance("X.509");
+        deviceHandler.myCert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(myNewCertificateString.getBytes()));
+        System.out.println("Received signed certificate from controller.");
+
+        if (deviceHandler.myCert == null) {
+            // create CSR
+            final String csrAsString = createCSR(deviceHandler.publicKey, deviceHandler.privateKey, policy.subnet());
+            final DeviceHello subControllerCSR = new DeviceHello(Map.of(), Set.of() ,csrAsString);
+            System.out.println("Generated DeviceHello message with CSR. Sending to controller now.");
+
+            // send the CSR message
+            ((DrasylServerChannel) ctx.channel()).serve(policy.controller()).addListener((ChannelFutureListener) future -> {
+                if (future.isSuccess()) {
+                    final Channel channelToController = future.channel();
+                    channelToController.writeAndFlush(subControllerCSR).addListener(FIRE_EXCEPTION_ON_FAILURE);
+                }
+                else {
+                    throw (Exception) future.cause();
+                }
+            });
+        }
     }
 
     @Override

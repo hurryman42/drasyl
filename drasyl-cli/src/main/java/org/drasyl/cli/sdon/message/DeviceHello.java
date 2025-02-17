@@ -33,21 +33,24 @@ import java.util.Set;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Message sent from device to controller.
+ * Message sent from device to (sub-)controller.
  */
 public class DeviceHello implements SdonMessage {
     private final Map<String, Object> facts;
     private final Set<Policy> policies;
+    private final String csr;
 
     @JsonCreator
     public DeviceHello(@JsonProperty("facts") final Map<String, Object> facts,
-                       @JsonProperty("policies") final Set<Policy> policies) {
+                       @JsonProperty("policies") final Set<Policy> policies,
+                       @JsonProperty("csr") final String csr) {
         this.facts = requireNonNull(facts);
         this.policies = requireNonNull(policies);
+        this.csr = requireNonNull(csr);
     }
 
     public DeviceHello(final Map<String, Object> facts) {
-        this(facts, Set.of());
+        this(facts, Set.of(), "");
     }
 
     @JsonGetter
@@ -60,11 +63,17 @@ public class DeviceHello implements SdonMessage {
         return policies;
     }
 
+    @JsonGetter
+    public String csr() {
+        return csr;
+    }
+
     @Override
     public String toString() {
         return "DeviceHello{" +
                 "facts='" + facts + '\'' +
                 ", policies='" + policies + '\'' +
+                ", CSR=" + csr + '\'' +
                 '}';
     }
 
@@ -77,11 +86,11 @@ public class DeviceHello implements SdonMessage {
             return false;
         }
         final DeviceHello that = (DeviceHello) o;
-        return facts.equals(that.facts) && policies.equals(that.policies);
+        return facts.equals(that.facts) && policies.equals(that.policies) && csr.equals(that.csr);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(facts, policies);
+        return Objects.hash(facts, policies, csr);
     }
 }

@@ -28,19 +28,10 @@ import org.luaj.vm2.LuaString;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 
-import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.cert.CertificateEncodingException;
-import java.security.cert.X509Certificate;
-import java.util.ArrayList;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -145,48 +136,5 @@ public class NetworkNode extends LuaTable {
         catch (final UnknownHostException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    /**
-     * Reads the certificate file, splits the certificate chain in it into the single certificates and returns them as a list.
-     *
-     * @param certFilePath the file path of the certificate(chain) to read
-     * @return String-List of the extracted certificates
-     * @throws IOException if an IO error occurs.
-     */
-    public List<String> loadCertificates(String certFilePath) throws IOException {
-        final List<String> certificates = new ArrayList<>();
-        final String certsString = Files.readString(Path.of(certFilePath));
-        final String[] certs = certsString.split("-----END CERTIFICATE-----");
-        for (int i = 0; i < (certs.length - 1); i++) {
-            String cert = certs[i] + "-----END CERTIFICATE-----\n";
-            if (cert.startsWith("\n")) {
-                cert = cert.substring(1);
-            }
-            certificates.add(cert);
-        }
-        return certificates;
-        /*final PEMParser pemParserCerts = new PEMParser(new FileReader(certFilePath));
-        Object object;
-        while ((object = pemParserCerts.readObject()) != null) {
-            if (object instanceof X509CertificateHolder) {
-                X509Certificate certificate = new JcaX509CertificateConverter().getCertificate((X509CertificateHolder) object);
-                String certificateString = convertCertToPem(certificate);
-                certificates.add(certificateString);
-            }
-        }*/
-    }
-
-    /**
-     * Converts the given {@code certificate} to a PEM-encoded string representation.
-     *
-     * @param certificate the certificate to encode
-     * @return PEM-encoded certificate as a String
-     * @throws CertificateEncodingException if an encoding error occurs.
-     */
-    public static String convertCertToPem(final X509Certificate certificate) throws CertificateEncodingException {
-        final Base64.Encoder encoder = Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.UTF_8));
-        final byte[] cert = certificate.getEncoded();
-        return "-----END CERTIFICATE-----" + "\n" + encoder.encodeToString(cert) + "\n" + "-----END PRIVATE KEY-----";
     }
 }

@@ -38,7 +38,7 @@ import java.util.Objects;
  */
 public class ControlledPolicy extends AbstractPolicy {
     public static final String HANDLER_NAME = StringUtil.simpleClassName(ControlledPolicy.class);
-    private DrasylAddress controller;
+    private final DrasylAddress controller;
 
     @JsonCreator
     public ControlledPolicy(@JsonProperty("controller") final DrasylAddress controller) {
@@ -87,7 +87,7 @@ public class ControlledPolicy extends AbstractPolicy {
     @Override
     public String toString() {
         return "ControlledPolicy{" +
-                ", controller=" + controller +
+                "controller=" + controller +
                 ", state=" + state +
                 '}';
     }

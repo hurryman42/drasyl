@@ -44,7 +44,11 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.PrivateKey;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import static java.util.Objects.requireNonNull;
@@ -66,7 +70,7 @@ public class SdonControllerCommand extends ChannelOptions {
 
     @Option(
             names = {"--pub-key"},
-            description = "Loads the controllers public key from specified file.",
+            description = "Loads the controller's public key from specified file.",
             paramLabel = "<file>",
             defaultValue = "controller-pub.pem"
     )
@@ -74,15 +78,24 @@ public class SdonControllerCommand extends ChannelOptions {
 
     @Option(
             names = {"--priv-key"},
-            description = "Loads the controllers private key from specified file.",
+            description = "Loads the controller's private key from specified file.",
             paramLabel = "<file>",
             defaultValue = "controller-priv.key"
     )
     private File privKeyFile;
 
+    @Option(
+            names = {"--cert-chain"},
+            description = "Loads the controller's certificate from specified file.",
+            paramLabel = "<file>",
+            defaultValue = "chain.crt"
+    )
+    private File certFile;
+
     private NetworkConfig config;
     private java.security.PublicKey publicKey;
     private PrivateKey privateKey;
+    private List<String> certificates;
 
     SdonControllerCommand(final PrintStream out,
                           final PrintStream err,
@@ -94,11 +107,13 @@ public class SdonControllerCommand extends ChannelOptions {
                           final Map<IdentityPublicKey, InetSocketAddress> superPeers,
                           final File configFile,
                           final File pubKeyFile,
-                          final File privKeyFile) {
+                          final File privKeyFile,
+                          final File certFile) {
         super(out, err, logLevel, identityFile, bindAddress, onlineTimeoutMillis, networkId, superPeers);
         this.configFile = requireNonNull(configFile);
         this.pubKeyFile = requireNonNull(pubKeyFile);
         this.privKeyFile = requireNonNull(privKeyFile);
+        this.certFile = requireNonNull(certFile);
     }
 
     @SuppressWarnings("unused")
@@ -122,6 +137,17 @@ public class SdonControllerCommand extends ChannelOptions {
             pemParserPrivateKey.close();
             privateKey = converter.getPrivateKey(privateKeyInfo);
 
+            certificates = new ArrayList<>();
+            final String certsString = Files.readString(certFile.toPath());
+            final String[] certs = certsString.split("-----END CERTIFICATE-----");
+            for (int i = 0; i < (certs.length - 1); i++) {
+                String cert = certs[i] + "-----END CERTIFICATE-----\n";
+                if (cert.startsWith("\n")) {
+                    cert = cert.substring(1);
+                }
+                certificates.add(cert);
+            }
+
             return super.call();
         }
         catch (final IOException e) {
@@ -131,12 +157,12 @@ public class SdonControllerCommand extends ChannelOptions {
 
     @Override
     protected ChannelHandler getServerChannelInitializer(final Worm<Integer> exitCode) {
-        return new SdonControllerChannelInitializer(onlineTimeoutMillis, out, err, exitCode, config.network(), publicKey, privateKey);
+        return new SdonControllerChannelInitializer(onlineTimeoutMillis, out, err, exitCode, config.network(), publicKey, privateKey, certificates);
     }
 
     @Override
     protected ChannelHandler getChildChannelInitializer(final Worm<Integer> exitCode) {
-        return new SdonControllerChildChannelInitializer(out, err, exitCode, config, publicKey, privateKey);
+        return new SdonControllerChildChannelInitializer(out, err, exitCode, config, publicKey, privateKey, certificates);
     }
 
     @Override

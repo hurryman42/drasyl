@@ -42,6 +42,7 @@ public class SubControllerPolicy extends AbstractPolicy {
     private Boolean is_sub_controller;
     private String subnet; // TODO: this as a String? not as an actual address with netmask? there is a class for a subnet address! use it here?
 
+    // TODO: add callback function from the lua-script and make sure its called periodically
     // TODO: maybe add a maximum number of devices that the sub-controller is allowed to manage? Or add that as a "permission" in the certificate?
 
     @JsonCreator
@@ -125,7 +126,7 @@ public class SubControllerPolicy extends AbstractPolicy {
                 "address=" + address +
                 ", controller=" + controller +
                 ", devices=" + devices +
-                ", sub-controller=" + is_sub_controller +
+                ", is_sub_controller=" + is_sub_controller +
                 ", state=" + state +
                 ", subnet=" + subnet +
                 '}';

@@ -35,6 +35,7 @@ import org.drasyl.util.Worm;
 
 import java.io.PrintStream;
 import java.security.PrivateKey;
+import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 import static org.drasyl.cli.sdon.SdonCommand.OBJECT_MAPPER;
@@ -46,13 +47,15 @@ public class SdonControllerChildChannelInitializer extends ConnectionChannelInit
     private final NetworkConfig networkConfig;
     private final java.security.PublicKey publicKey;
     private final PrivateKey privateKey;
+    private final List<String> certificates;
 
     public SdonControllerChildChannelInitializer(final PrintStream out,
                                                  final PrintStream err,
                                                  final Worm<Integer> exitCode,
                                                  final NetworkConfig networkConfig,
                                                  final java.security.PublicKey publicKey,
-                                                 final PrivateKey privateKey) {
+                                                 final PrivateKey privateKey,
+                                                 final List<String> certificates) {
         super(true, DEFAULT_SERVER_PORT);
         this.out = requireNonNull(out);
         this.err = requireNonNull(err);
@@ -60,6 +63,7 @@ public class SdonControllerChildChannelInitializer extends ConnectionChannelInit
         this.networkConfig = requireNonNull(networkConfig);
         this.publicKey = requireNonNull(publicKey);
         this.privateKey = requireNonNull(privateKey);
+        this.certificates = requireNonNull(certificates);
     }
 
     @Override

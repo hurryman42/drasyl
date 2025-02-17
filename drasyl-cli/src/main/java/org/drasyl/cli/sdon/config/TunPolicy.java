@@ -30,7 +30,6 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.util.AttributeKey;
 import io.netty.util.internal.StringUtil;
 import org.drasyl.channel.tun.TunChannel;
-import org.drasyl.cli.sdon.handler.policy.TunPolicyHandler;
 import org.drasyl.cli.util.InetAddressDeserializer;
 import org.drasyl.cli.util.LuaHelper;
 import org.drasyl.identity.DrasylAddress;

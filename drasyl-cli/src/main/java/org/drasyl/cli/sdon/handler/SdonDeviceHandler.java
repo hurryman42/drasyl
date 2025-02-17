@@ -27,12 +27,6 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.operator.ContentSigner;
-import org.bouncycastle.operator.OperatorCreationException;
-import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
-import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
 import org.drasyl.channel.DrasylServerChannel;
 import org.drasyl.cli.sdon.config.ControlledPolicy;
 import org.drasyl.cli.sdon.config.Device;
@@ -42,7 +36,6 @@ import org.drasyl.cli.sdon.config.Policy;
 import org.drasyl.cli.sdon.config.TunPolicy;
 import org.drasyl.cli.sdon.event.SdonMessageReceived;
 import org.drasyl.cli.sdon.message.ControllerHello;
-import org.drasyl.cli.sdon.message.DeviceCSR;
 import org.drasyl.cli.sdon.message.DeviceHello;
 import org.drasyl.cli.sdon.message.SdonMessage;
 import org.drasyl.identity.DrasylAddress;
@@ -51,23 +44,20 @@ import org.drasyl.util.logging.Logger;
 import org.drasyl.util.logging.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.io.PrintStream;
 import java.net.InetAddress;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.security.Security;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.util.Base64;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import static io.netty.channel.ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE;
@@ -85,7 +75,8 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
     private final IdentityPublicKey controller;
     public final PublicKey publicKey;
     public final PrivateKey privateKey;
-    private X509Certificate certificate;
+    public X509Certificate myCert;
+    public List<String> myCertificateStrings;
     private final Map<String, Object> facts;
     State state;
     public final Set<Policy> policies = new HashSet<>();
@@ -131,7 +122,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                         out.println("Connected!");
                         out.print("Register at controller...");
                         state = JOINING;
-                        final DeviceHello hello = new DeviceHello(facts, policies);
+                        final DeviceHello hello = new DeviceHello(facts, policies, "");
                         LOG.debug("Send `{}`", hello);
                         channel.writeAndFlush(hello).addListener(FIRE_EXCEPTION_ON_FAILURE);
                     }
@@ -142,7 +133,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                 if (future.isSuccess()) {
                     if (state == JOINED) {
                         final Channel channel = future.channel();
-                        final DeviceHello hello = new DeviceHello(facts, policies);
+                        final DeviceHello hello = new DeviceHello(facts, policies, "");
                         LOG.debug("Send `{}`", hello);
                         channel.writeAndFlush(hello).addListener(FIRE_EXCEPTION_ON_FAILURE);
                     }
@@ -161,8 +152,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
 
             if (sender.equals(controller) && msg instanceof ControllerHello) {
                 final ControllerHello controllerHello = (ControllerHello) msg;
-                final List<String> certificates = controllerHello.certificates();
-                //certificates.replaceAll(s -> s.replace("\n", ""));
+                List<String> certificates = controllerHello.certificates();
 
                 if (!certificates.isEmpty() && !controllerHello.policies().isEmpty()) {
                     // load rootCertificate from file & check whether it equals the last certificate in the message
@@ -244,46 +234,30 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                         }
                         else if (policy instanceof SubControllerPolicy) {
                             final SubControllerPolicy subControllerPolicy = (SubControllerPolicy) policy;
-                            final Boolean isSubController = subControllerPolicy.is_sub_controller();
-                            final DrasylAddress myAddress = subControllerPolicy.address();
+                            // the sub-controller instantiation (create CSR & send it to controller) is now done by the SubControllerPolicyHandler (called on the first SubControllerPolicy that is received)
 
-                            /*
-                            // check whether I have the certificate already, not via this weird state
-                            if (!isSubController) { // start SubController creation process: create and send a DeviceCSR
-                                final String csrAsString = createCSR(publicKey, privateKey, subControllerPolicy.subnet());
-                                final DeviceCSR subControllerCSR = new DeviceCSR(csrAsString);
-                                out.println("Generated DeviceCSR message. Sending to controller now.");
+                            myCertificateStrings = certificates;
 
-                                // send the CSR message
-                                ((DrasylServerChannel) ctx.channel()).serve(subControllerPolicy.controller()).addListener((ChannelFutureListener) future -> {
-                                    if (future.isSuccess()) {
-                                        final Channel channelToController = future.channel();
-                                        channelToController.writeAndFlush(subControllerCSR).addListener(FIRE_EXCEPTION_ON_FAILURE);
-                                    }
-                                    else {
-                                        throw (Exception) future.cause();
-                                    }
-                                });
-                            }*/
                             // the device is a sub-controller --> it receives SubControllerPolicies & sends ControlledPolicies to its devices
+                            final DrasylAddress myAddress = subControllerPolicy.address();
+                            final ControlledPolicy controlledPolicy = new ControlledPolicy(myAddress); // maybe individual policy type created by that sub-controller & only send by it (metaprogramming; future work)
+
                             final Set<DrasylAddress> myDeviceAddresses = subControllerPolicy.devices();
                             final Devices myDevices = new Devices();
 
-                            // maybe individual policy type created by that sub-controller and only send by it (metaprogramming)
-                            final ControlledPolicy controlledPolicy = new ControlledPolicy(myAddress);
-
-                            final Set<Policy> devicePolicies = Set.of(controlledPolicy); // TODO: needs additional TunPolicy and not only ControlledPolicy?
-                            final DeviceHello message = new DeviceHello(facts, devicePolicies);
+                            final Set<Policy> devicePolicies = Set.of(controlledPolicy); // TODO: needs additional TunPolicy?
+                            final ControllerHello message = new ControllerHello(devicePolicies, Objects.requireNonNullElse(myCertificateStrings, certificates));
 
                             for (DrasylAddress deviceAddress : myDeviceAddresses) {
-                                // add this Device to the Devices Object
+                                // add the controlled Device to the myDevices Object
                                 final Device thisDevice = new Device(deviceAddress, myAddress);
                                 myDevices.addDevice(thisDevice);
 
-                                // send the ControlledPolicy via a DeviceHello to the device
+                                // send the ControlledPolicy via a ControllerHello to the controlled device
                                 ((DrasylServerChannel) ctx.channel()).serve(deviceAddress).addListener((ChannelFutureListener) future -> {
                                     if (future.isSuccess()) {
                                         final Channel channelToController = future.channel();
+                                        LOG.debug("Send {} to {}.", message.toString().replace("\n", ""), deviceAddress);
                                         channelToController.writeAndFlush(message).addListener(FIRE_EXCEPTION_ON_FAILURE);
                                     }
                                     else {
@@ -295,20 +269,13 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                         else if (policy instanceof ControlledPolicy) {
                             final ControlledPolicy controlledPolicy = (ControlledPolicy) policy;
                             final DrasylAddress controllerAddress = controlledPolicy.controller();
-                            out.println("Received ControlledPolicy with the address of my new Controller.");
+                            out.println("Received ControlledPolicy with the address of my new controller.");
                             out.println("My Controller's Address is " + controllerAddress.toString());
                         }
                     }
                 }
                 else if (certificates.isEmpty() && !controllerHello.policies().isEmpty()) {
                     throw new CertificateException("No certificates although there are policies.");
-                }
-                else if (!certificates.isEmpty() && controllerHello.policies().isEmpty()) {
-                    final String myNewCertificateString = certificates.get(0);
-                    final CertificateFactory cf = CertificateFactory.getInstance("X.509");
-                    certificate = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(myNewCertificateString.getBytes()));
-                    // TODO: set isSubController of the device that is sub-controller to true
-                    out.println("Received certificate from controller.");
                 }
 
                 // set state to JOINED if it is not already
@@ -317,9 +284,9 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                 }
                 state = JOINED;
 
-                // extract policies from the certificate?
+                // future work: extract policies from the certificate
                 final Set<Policy> newPolicies = controllerHello.policies();
-                LOG.trace("Got new policies from controller: {}", newPolicies);
+                LOG.debug("Got new policies from controller: {}", newPolicies);
 
                 // remove old policies
                 for (final Policy policy : policies) {
@@ -344,28 +311,6 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
         else {
             ctx.fireUserEventTriggered(evt);
         }
-    }
-
-    private String createCSR(PublicKey publicKey, PrivateKey privateKey, String subnet) throws OperatorCreationException, IOException {
-        Security.addProvider(new BouncyCastleProvider());
-
-        // create only subject info for future certificate
-        final X500Name subjectName = new X500Name("CN=" + subnet);
-
-        // create CSR builder
-        final JcaPKCS10CertificationRequestBuilder csrBuilder = new JcaPKCS10CertificationRequestBuilder(subjectName, publicKey);
-        // create a content signer
-        final ContentSigner signer = new JcaContentSignerBuilder("Ed25519").setProvider("BC").build(privateKey);
-        // build the CSR
-        final PKCS10CertificationRequest csr = csrBuilder.build(signer);
-
-        return convertCSRToPemString(csr);
-    }
-
-    private static String convertCSRToPemString(final PKCS10CertificationRequest csr) throws IOException {
-        final Base64.Encoder encoder = Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.UTF_8));
-        final byte[] csrBytes = csr.getEncoded();
-        return "-----BEGIN CERTIFICATE REQUEST-----" + "\n" + encoder.encodeToString(csrBytes) + "\n" + "-----END CERTIFICATE REQUEST-----";
     }
 
     enum State {
