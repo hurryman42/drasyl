@@ -24,6 +24,9 @@ package org.drasyl.cli.sdon.handler.policy;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.drasyl.cli.sdon.config.ControlledPolicy;
+import org.drasyl.cli.sdon.handler.SdonDeviceHandler;
+import org.drasyl.identity.DrasylAddress;
+import org.drasyl.identity.IdentityPublicKey;
 import org.drasyl.util.logging.Logger;
 import org.drasyl.util.logging.LoggerFactory;
 
@@ -39,11 +42,20 @@ public class ControlledPolicyHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void handlerAdded(final ChannelHandlerContext ctx) {
-        // NOOP
+        final SdonDeviceHandler deviceHandler = ctx.pipeline().get(SdonDeviceHandler.class);
+        final DrasylAddress controllerAddress = policy.controller();
+        deviceHandler.fallbackController = deviceHandler.controller;
+        deviceHandler.controller = IdentityPublicKey.of(controllerAddress.toString());
+
+        System.out.println("------------------------------------------------------------------------------------------------");
+        System.out.println("I am being CONTROLLED by: " + controllerAddress.toString());
+        System.out.println("------------------------------------------------------------------------------------------------");
     }
 
     @Override
     public void handlerRemoved(final ChannelHandlerContext ctx) {
-        // NOOP
+        final SdonDeviceHandler deviceHandler = ctx.pipeline().get(SdonDeviceHandler.class);
+        deviceHandler.controller = deviceHandler.fallbackController;
+        deviceHandler.fallbackController = null;
     }
 }

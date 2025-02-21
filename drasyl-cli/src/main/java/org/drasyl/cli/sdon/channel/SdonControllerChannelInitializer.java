@@ -30,9 +30,11 @@ import org.drasyl.cli.sdon.handler.SdonControllerHandler;
 import org.drasyl.util.Worm;
 import org.drasyl.util.logging.Logger;
 import org.drasyl.util.logging.LoggerFactory;
+import org.drasyl.util.network.Subnet;
 
 import java.io.PrintStream;
 import java.security.PrivateKey;
+import java.security.cert.X509Certificate;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
@@ -47,6 +49,8 @@ public class SdonControllerChannelInitializer extends AbstractChannelInitializer
     private java.security.PublicKey publicKey;
     private PrivateKey privateKey;
     private List<String> certificates;
+    private X509Certificate myCert;
+    private Subnet mySubnet;
 
     @SuppressWarnings("java:S107")
     public SdonControllerChannelInitializer(final long onlineTimeoutMillis,
@@ -56,7 +60,9 @@ public class SdonControllerChannelInitializer extends AbstractChannelInitializer
                                             final Network network,
                                             final java.security.PublicKey publicKey,
                                             final PrivateKey privateKey,
-                                            final List<String> certificates) {
+                                            final List<String> certificates,
+                                            final X509Certificate myCert,
+                                            final Subnet mySubnet) {
         super(onlineTimeoutMillis);
         this.out = requireNonNull(out);
         this.err = requireNonNull(err);
@@ -65,6 +71,8 @@ public class SdonControllerChannelInitializer extends AbstractChannelInitializer
         this.publicKey = requireNonNull(publicKey);
         this.privateKey = requireNonNull(privateKey);
         this.certificates = requireNonNull(certificates);
+        this.myCert = requireNonNull(myCert);
+        this.mySubnet = requireNonNull(mySubnet);
     }
 
     @Override
@@ -72,7 +80,7 @@ public class SdonControllerChannelInitializer extends AbstractChannelInitializer
         super.initChannel(ch);
 
         final ChannelPipeline p = ch.pipeline();
-        p.addLast(new SdonControllerHandler(out, network, publicKey, privateKey, certificates));
+        p.addLast(new SdonControllerHandler(out, network, publicKey, privateKey, certificates, myCert, mySubnet));
         p.addLast(new PrintAndExitOnExceptionHandler(err, exitCode));
     }
 }

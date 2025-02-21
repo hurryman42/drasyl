@@ -40,22 +40,26 @@ public class SubControllerPolicy extends AbstractPolicy {
     private DrasylAddress controller;
     private Set<DrasylAddress> devices;
     private Boolean is_sub_controller;
-    private String subnet; // TODO: this as a String? not as an actual address with netmask? there is a class for a subnet address! use it here?
+    private String subnet; // the subnet has to be a String, because a Subnet Object is not serializable (but before & after this PolicyClass it is a Subnet)
+    private String myFunctionFileName;
 
     // TODO: add callback function from the lua-script and make sure its called periodically
-    // TODO: maybe add a maximum number of devices that the sub-controller is allowed to manage? Or add that as a "permission" in the certificate?
+    // TODO: maybe add a maximum number of devices that the sub-controller is allowed to manage? Or add that as a "permission" in the certificate? --> in the function of the sub-controller!
 
     @JsonCreator
     public SubControllerPolicy(@JsonProperty("address") final DrasylAddress address,
                                @JsonProperty("controller") final DrasylAddress controller,
                                @JsonProperty("devices") final Set<DrasylAddress> devices,
                                @JsonProperty("is_sub_controller") final Boolean isSubController,
-                               @JsonProperty("subnet") final String subnet) {
+                               @JsonProperty("subnet_string") final String subnet,
+                               @JsonProperty("my_function_file_name") final String myFunctionFileName) {
+
         this.address = address;
         this.controller = controller;
         this.devices = devices;
         this.is_sub_controller = isSubController;
         this.subnet = subnet;
+        this.myFunctionFileName = myFunctionFileName;
     }
 
     @JsonGetter("address")
@@ -78,9 +82,14 @@ public class SubControllerPolicy extends AbstractPolicy {
         return is_sub_controller;
     }
 
-    @JsonGetter("subnet")
-    public String subnet() {
+    @JsonGetter("subnet_string")
+    public String subnetString() {
         return subnet;
+    }
+
+    @JsonGetter("my_function_file_name")
+    public String myFunctionFileName() {
+        return myFunctionFileName;
     }
 
     @Override
@@ -129,6 +138,7 @@ public class SubControllerPolicy extends AbstractPolicy {
                 ", is_sub_controller=" + is_sub_controller +
                 ", state=" + state +
                 ", subnet=" + subnet +
+                ", myFunctionFileName=" + myFunctionFileName +
                 '}';
     }
 }

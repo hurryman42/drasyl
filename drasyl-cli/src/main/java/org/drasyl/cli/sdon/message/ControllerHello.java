@@ -65,7 +65,7 @@ public class ControllerHello implements SdonMessage {
     public String toString() {
         return "ControllerHello{" +
                 "policies='" + policies + '\'' +
-                "certificates='" + certificates + '\'' +
+                ", certificates='" + certificates + '\'' +
                 '}';
     }
 

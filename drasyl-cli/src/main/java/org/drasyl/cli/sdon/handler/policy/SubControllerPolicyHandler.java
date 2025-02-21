@@ -33,24 +33,34 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
 import org.drasyl.channel.DrasylServerChannel;
+import org.drasyl.cli.sdon.config.Device;
+import org.drasyl.cli.sdon.config.Devices;
+import org.drasyl.cli.sdon.config.Network;
+import org.drasyl.cli.sdon.config.NetworkConfig;
+import org.drasyl.cli.sdon.config.NetworkNode;
+import org.drasyl.cli.sdon.config.Policy;
 import org.drasyl.cli.sdon.config.SubControllerPolicy;
 import org.drasyl.cli.sdon.handler.SdonDeviceHandler;
+import org.drasyl.cli.sdon.message.ControllerHello;
 import org.drasyl.cli.sdon.message.DeviceHello;
+import org.drasyl.identity.DrasylAddress;
 import org.drasyl.util.logging.Logger;
 import org.drasyl.util.logging.LoggerFactory;
+import org.drasyl.util.network.Subnet;
+import org.luaj.vm2.LuaString;
 
-import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Security;
 import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
-import java.security.cert.X509Certificate;
 import java.util.Base64;
-import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import static io.netty.channel.ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE;
@@ -68,22 +78,102 @@ public class SubControllerPolicyHandler extends ChannelInboundHandlerAdapter {
     public void handlerAdded(final ChannelHandlerContext ctx) throws IOException, OperatorCreationException, CertificateException {
         final SdonDeviceHandler deviceHandler = ctx.pipeline().get(SdonDeviceHandler.class);
 
-        final String myNewCertificateString = deviceHandler.myCertificateStrings.get(0);
-        final CertificateFactory cf = CertificateFactory.getInstance("X.509");
-        deviceHandler.myCert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(myNewCertificateString.getBytes()));
-        System.out.println("Received signed certificate from controller.");
+        System.out.println("------------------------------------------------------------------------------------------------");
+        System.out.println("I am a SUB-CONTROLLER with devices: " + policy.devices().toString());
+        System.out.println("My controller is: " + policy.controller());
 
-        if (deviceHandler.myCert == null) {
-            // create CSR
-            final String csrAsString = createCSR(deviceHandler.publicKey, deviceHandler.privateKey, policy.subnet());
-            final DeviceHello subControllerCSR = new DeviceHello(Map.of(), Set.of() ,csrAsString);
-            System.out.println("Generated DeviceHello message with CSR. Sending to controller now.");
+        // create CSR
+        final String csrAsString = createCSR(deviceHandler.publicKey, deviceHandler.privateKey, new Subnet(policy.subnetString()));
+        final DeviceHello subControllerCSR = new DeviceHello(Map.of(), Set.of(), csrAsString);
+        System.out.println("Generated DeviceHello message with CSR. Sending to controller now.");
 
-            // send the CSR message
-            ((DrasylServerChannel) ctx.channel()).serve(policy.controller()).addListener((ChannelFutureListener) future -> {
+        // send the CSR message
+        ((DrasylServerChannel) ctx.channel()).serve(policy.controller()).addListener((ChannelFutureListener) future -> {
+            if (future.isSuccess()) {
+                final Channel channelToController = future.channel();
+                LOG.debug("Send {} to {}.", subControllerCSR.toString().replace("\n", ""), policy.controller());
+                channelToController.writeAndFlush(subControllerCSR).addListener(FIRE_EXCEPTION_ON_FAILURE);
+            }
+            else {
+                throw (Exception) future.cause();
+            }
+        });
+
+        try {
+            // read myFunctionFileName & create a NetworkConfig & other variables with it
+            File configFile = new File(policy.myFunctionFileName());
+            NetworkConfig config = NetworkConfig.parseFile(configFile);
+            Network network = config.network();
+            Devices devices = new Devices();
+            for (final DrasylAddress deviceAddress : policy.devices()) {
+                Device device = devices.getOrCreateDevice(deviceAddress, policy.address());
+                device.setOnline();
+            }
+            LOG.debug("Read SubControllerNetworkConfig out of file.");
+
+
+            // do matchmaking
+            final Set<Device> assignedDevices = new HashSet<>();
+            final Map<LuaString, NetworkNode> nodes = network.getNodes();
+            for (final Map.Entry<LuaString, NetworkNode> entry : nodes.entrySet()) {
+                final NetworkNode node = entry.getValue();
+
+                Device bestMatch = null;
+                int minDistance = Integer.MAX_VALUE;
+
+                for (final Device device : devices.getDevices()) {
+                    if (!assignedDevices.contains(device)) {
+                        final int distance = node.getDistance(device);
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            bestMatch = device;
+                        }
+                    }
+                }
+
+                if (bestMatch != null) {
+                    assignedDevices.add(bestMatch);
+                    node.setDevice(bestMatch);
+                }
+            }
+            LOG.debug("Matchmaking (nodes to devices) done.");
+
+            // disseminate policies
+            for (final Device device : devices.getDevices()) {
+                NetworkNode node = null;
+                for (final Map.Entry<LuaString, NetworkNode> entry : nodes.entrySet()) {
+                    if (Objects.equals(entry.getValue().device(), device.address())) {
+                        node = entry.getValue();
+                    }
+                }
+                final Set<Policy> policies;
+                if (node != null) {
+                    policies = node.createPolicies();
+                }
+                else {
+                    policies = Set.of();
+                }
+                deviceHandler.policiesForMyDevices.addAll(policies);
+                //LOG.debug("Created Policies & Certificates for " + device.address().toString());
+            }
+        }
+        catch (IOException e) {
+            LOG.debug(e);
+        }
+
+        System.out.println("------------------------------------------------------------------------------------------------");
+    }
+
+    @Override
+    public void handlerRemoved(final ChannelHandlerContext ctx) {
+        // send reset message to all my devices
+        ControllerHello resetMsg = new ControllerHello(Set.of(), List.of());
+        for (DrasylAddress devAddress : policy.devices()) {
+            ((DrasylServerChannel) ctx.channel()).serve(devAddress).addListener((ChannelFutureListener) future -> {
                 if (future.isSuccess()) {
                     final Channel channelToController = future.channel();
-                    channelToController.writeAndFlush(subControllerCSR).addListener(FIRE_EXCEPTION_ON_FAILURE);
+                    LOG.debug("Send {} to {}.", resetMsg.toString().replace("\n", ""), devAddress);
+                    channelToController.writeAndFlush(resetMsg).addListener(FIRE_EXCEPTION_ON_FAILURE);
                 }
                 else {
                     throw (Exception) future.cause();
@@ -92,16 +182,11 @@ public class SubControllerPolicyHandler extends ChannelInboundHandlerAdapter {
         }
     }
 
-    @Override
-    public void handlerRemoved(final ChannelHandlerContext ctx) {
-        // NOOP
-    }
-
-    private String createCSR(PublicKey publicKey, PrivateKey privateKey, String subnet) throws OperatorCreationException, IOException {
+    private String createCSR(PublicKey publicKey, PrivateKey privateKey, Subnet subnet) throws OperatorCreationException, IOException {
         Security.addProvider(new BouncyCastleProvider());
 
         // create only subject info for future certificate
-        final X500Name subjectName = new X500Name("CN=" + subnet);
+        final X500Name subjectName = new X500Name("CN=" + subnet.toString());
 
         // create CSR builder
         final JcaPKCS10CertificationRequestBuilder csrBuilder = new JcaPKCS10CertificationRequestBuilder(subjectName, publicKey);

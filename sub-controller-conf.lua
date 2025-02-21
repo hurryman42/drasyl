@@ -1,0 +1,6 @@
+print("------------------------------------")
+print("The sub-controller script is called!")
+net = create_network()
+net:add_node("n1", {ip="10.0.1.42/24"})
+register_network(net)
+print("------------------------------------")

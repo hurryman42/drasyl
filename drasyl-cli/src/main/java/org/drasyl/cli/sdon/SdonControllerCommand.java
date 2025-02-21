@@ -36,17 +36,19 @@ import org.drasyl.identity.IdentityPublicKey;
 import org.drasyl.util.Worm;
 import org.drasyl.util.logging.Logger;
 import org.drasyl.util.logging.LoggerFactory;
+import org.drasyl.util.network.Subnet;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileReader;
-import java.io.IOException;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.security.PrivateKey;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -96,6 +98,8 @@ public class SdonControllerCommand extends ChannelOptions {
     private java.security.PublicKey publicKey;
     private PrivateKey privateKey;
     private List<String> certificates;
+    private X509Certificate myCert;
+    private Subnet mySubnet;
 
     SdonControllerCommand(final PrintStream out,
                           final PrintStream err,
@@ -127,16 +131,19 @@ public class SdonControllerCommand extends ChannelOptions {
 
             final JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
 
+            // read the controller's publicKey out of the pubKeyFile
             final PEMParser pemParserPublicKey = new PEMParser(new FileReader(pubKeyFile));
             final SubjectPublicKeyInfo publicKeyInfo = (SubjectPublicKeyInfo) pemParserPublicKey.readObject();
             pemParserPublicKey.close();
             publicKey = converter.getPublicKey(publicKeyInfo);
 
+            // read the controller's privateKey out of the privKeyFile
             final PEMParser pemParserPrivateKey = new PEMParser(new FileReader(privKeyFile));
             final PrivateKeyInfo privateKeyInfo = (PrivateKeyInfo) pemParserPrivateKey.readObject();
             pemParserPrivateKey.close();
             privateKey = converter.getPrivateKey(privateKeyInfo);
 
+            // read the certFile & write the certificates in a List
             certificates = new ArrayList<>();
             final String certsString = Files.readString(certFile.toPath());
             final String[] certs = certsString.split("-----END CERTIFICATE-----");
@@ -148,21 +155,39 @@ public class SdonControllerCommand extends ChannelOptions {
                 certificates.add(cert);
             }
 
+            // get controller's certificate (myCert) out of the List of certificates
+            final String myCertString = certificates.get(0);
+            final CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            myCert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(myCertString.getBytes()));
+
+            // extract the controller's subnet (mySubnet) as the subject of its certificate (myCert)
+            String myCertSubjectString = myCert.getSubjectX500Principal().toString();
+            int startIndex = myCertSubjectString.indexOf("CN=");
+            if (startIndex != -1) {
+                startIndex += 3;
+                int endIndex = myCertSubjectString.indexOf(",", startIndex);
+                if (endIndex == -1) {
+                    endIndex = myCertSubjectString.length();
+                }
+                myCertSubjectString = myCertSubjectString.substring(startIndex, endIndex).trim();
+                mySubnet = new Subnet(myCertSubjectString);
+            }
+
             return super.call();
         }
-        catch (final IOException e) {
+        catch (final Exception e) {
             throw new RuntimeException(e);
         }
     }
 
     @Override
     protected ChannelHandler getServerChannelInitializer(final Worm<Integer> exitCode) {
-        return new SdonControllerChannelInitializer(onlineTimeoutMillis, out, err, exitCode, config.network(), publicKey, privateKey, certificates);
+        return new SdonControllerChannelInitializer(onlineTimeoutMillis, out, err, exitCode, config.network(), publicKey, privateKey, certificates, myCert, mySubnet);
     }
 
     @Override
     protected ChannelHandler getChildChannelInitializer(final Worm<Integer> exitCode) {
-        return new SdonControllerChildChannelInitializer(out, err, exitCode, config, publicKey, privateKey, certificates);
+        return new SdonControllerChildChannelInitializer(out, err, exitCode, config, publicKey, privateKey, certificates); // does this need myCert and mySubnet? does it even need the Keys & certificates?
     }
 
     @Override

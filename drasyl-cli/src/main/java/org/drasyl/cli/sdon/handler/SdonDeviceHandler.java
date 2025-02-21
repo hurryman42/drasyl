@@ -72,14 +72,17 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
     private static final Logger LOG = LoggerFactory.getLogger(SdonDeviceHandler.class);
     private static final int DEVICE_HELLO_INTERVAL = 5_000; // every 5 seconds
     private final PrintStream out;
-    private final IdentityPublicKey controller;
+    public IdentityPublicKey fallbackController;
+    public IdentityPublicKey controller;
     public final PublicKey publicKey;
     public final PrivateKey privateKey;
     public X509Certificate myCert;
+    public String myCertAsString;
     public List<String> myCertificateStrings;
     private final Map<String, Object> facts;
     State state;
-    public final Set<Policy> policies = new HashSet<>();
+    public final Set<Policy> policiesForMe = new HashSet<>();
+    public final Set<Policy> policiesForMyDevices = new HashSet<>();
 
     public SdonDeviceHandler(final PrintStream out,
                              final IdentityPublicKey controller,
@@ -122,8 +125,8 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                         out.println("Connected!");
                         out.print("Register at controller...");
                         state = JOINING;
-                        final DeviceHello hello = new DeviceHello(facts, policies, "");
-                        LOG.debug("Send `{}`", hello);
+                        final DeviceHello hello = new DeviceHello(facts, policiesForMe, "");
+                        LOG.debug("Send {} to {}", hello, controller);
                         channel.writeAndFlush(hello).addListener(FIRE_EXCEPTION_ON_FAILURE);
                     }
                 }
@@ -133,8 +136,8 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                 if (future.isSuccess()) {
                     if (state == JOINED) {
                         final Channel channel = future.channel();
-                        final DeviceHello hello = new DeviceHello(facts, policies, "");
-                        LOG.debug("Send `{}`", hello);
+                        final DeviceHello hello = new DeviceHello(facts, policiesForMe, "");
+                        LOG.debug("Send {} to {}", hello, controller);
                         channel.writeAndFlush(hello).addListener(FIRE_EXCEPTION_ON_FAILURE);
                     }
                 }
@@ -150,11 +153,12 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
             final SdonMessage msg = ((SdonMessageReceived) evt).msg();
             LOG.debug("Received from `{}`: {}", sender, msg.toString().replace("\n", ""));
 
-            if (sender.equals(controller) && msg instanceof ControllerHello) {
+            if (msg instanceof ControllerHello) { // && sender.equals(controller)
                 final ControllerHello controllerHello = (ControllerHello) msg;
-                List<String> certificates = controllerHello.certificates();
+                final List<String> certificates = controllerHello.certificates();
 
                 if (!certificates.isEmpty() && !controllerHello.policies().isEmpty()) {
+                    out.println("----------------------------------------------------------------------------------------------");
                     // load rootCertificate from file & check whether it equals the last certificate in the message
                     final String rootCertFilePath = "cacert.crt"; // TODO: make this more dynamic (command inputs?)
                     final String rootCertString = Files.readString(Path.of(rootCertFilePath));
@@ -162,7 +166,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                         throw new CertificateException("Not the right root certificate!");
                     }
 
-                    // check validity of the sender's certificates
+                    // check validity of received certificate chain
                     final CertificateFactory cf = CertificateFactory.getInstance("X.509");
                     for (int i = 0; i < certificates.size() - 1; i++) {
                         // load current certificate
@@ -182,7 +186,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                         certificate.verify(nextPubKey);
                     }
 
-                    // check subnet address
+                    // check subnet address in the "last" certificate
                     final String certString = certificates.get(0);
                     final X509Certificate cert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(certString.getBytes()));
                     final X500Name subject = new JcaX509CertificateHolder(cert).getSubject();
@@ -195,13 +199,13 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                     final byte[] subnetAddressBytes = subnetAddress.getAddress();
                     final short subnetNetmask = Short.parseShort(subnetSplit[1]);
 
+                    // react to received policies
                     final Set<Policy> policies = controllerHello.policies();
                     for (Policy policy : policies) {
                         if (policy instanceof TunPolicy) {
                             final TunPolicy tunPolicy = (TunPolicy) policy;
                             final InetAddress ipAddress = tunPolicy.address();
                             final byte[] ipAddressBytes = ipAddress.getAddress();
-
                             final short netmask = tunPolicy.netmask();
 
                             final int numBytesToMask = subnetNetmask / 8;
@@ -232,28 +236,37 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                                 throw new Exception("The netmask of the IP address from the policy is not the same as netmask from the controller's certificate.");
                             }*/
                         }
-                        else if (policy instanceof SubControllerPolicy) {
+                        else if (policy instanceof SubControllerPolicy) { // the device is a sub-controller --> it receives SubControllerPolicies & sends ControlledPolicies to its devices
                             final SubControllerPolicy subControllerPolicy = (SubControllerPolicy) policy;
+
                             // the sub-controller instantiation (create CSR & send it to controller) is now done by the SubControllerPolicyHandler (called on the first SubControllerPolicy that is received)
+                            // the sub-controller receives its own certificate only once and then the chain without it (until the controller's certificate)
+                            final String myNewCertificateString = certificates.get(0);
+                            out.println("Received certificate: " + myNewCertificateString.replace("\n", "")); // DEBUG
+                            if (myCertificateStrings == null) {
+                                myCertificateStrings = certificates;
+                            }
+                            // to detect the one time when the sub-controller's certificate is sent, it checks, whether the certificate candidate was already sent or is in the already sent certificate chain
+                            if (!myNewCertificateString.equals(myCertAsString) && !myCertificateStrings.contains(myNewCertificateString)) {
+                                myCertificateStrings = certificates;
+                                myCertAsString = myNewCertificateString;
+                                myCert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(myNewCertificateString.getBytes()));
+                                out.println("Accepted as my certificate: " + myNewCertificateString.replace("\n", "")); // DEBUG
+                            }
+                            out.println("----------------------------------------------------------------------------------------------");
 
-                            myCertificateStrings = certificates;
-
-                            // the device is a sub-controller --> it receives SubControllerPolicies & sends ControlledPolicies to its devices
+                            // create ControllerHello message with ControlledPolicy for each of the sub-controller's devices (same message for all of them)
                             final DrasylAddress myAddress = subControllerPolicy.address();
-                            final ControlledPolicy controlledPolicy = new ControlledPolicy(myAddress); // maybe individual policy type created by that sub-controller & only send by it (metaprogramming; future work)
+                            policiesForMyDevices.add(new ControlledPolicy(myAddress)); // maybe individual policy type created by that sub-controller & only send by it (metaprogramming; future work)
+                            final ControllerHello message = new ControllerHello(policiesForMyDevices, Objects.requireNonNullElse(myCertificateStrings, certificates));
 
+                            // for all the sub-controller's devices: add to myDevices & send ControllerHello
                             final Set<DrasylAddress> myDeviceAddresses = subControllerPolicy.devices();
                             final Devices myDevices = new Devices();
-
-                            final Set<Policy> devicePolicies = Set.of(controlledPolicy); // TODO: needs additional TunPolicy?
-                            final ControllerHello message = new ControllerHello(devicePolicies, Objects.requireNonNullElse(myCertificateStrings, certificates));
-
                             for (DrasylAddress deviceAddress : myDeviceAddresses) {
-                                // add the controlled Device to the myDevices Object
                                 final Device thisDevice = new Device(deviceAddress, myAddress);
                                 myDevices.addDevice(thisDevice);
 
-                                // send the ControlledPolicy via a ControllerHello to the controlled device
                                 ((DrasylServerChannel) ctx.channel()).serve(deviceAddress).addListener((ChannelFutureListener) future -> {
                                     if (future.isSuccess()) {
                                         final Channel channelToController = future.channel();
@@ -265,12 +278,6 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                                     }
                                 });
                             }
-                        }
-                        else if (policy instanceof ControlledPolicy) {
-                            final ControlledPolicy controlledPolicy = (ControlledPolicy) policy;
-                            final DrasylAddress controllerAddress = controlledPolicy.controller();
-                            out.println("Received ControlledPolicy with the address of my new controller.");
-                            out.println("My Controller's Address is " + controllerAddress.toString());
                         }
                     }
                 }
@@ -284,12 +291,11 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                 }
                 state = JOINED;
 
-                // future work: extract policies from the certificate
                 final Set<Policy> newPolicies = controllerHello.policies();
-                LOG.debug("Got new policies from controller: {}", newPolicies);
+                LOG.debug("Got policies from controller: {}", newPolicies);
 
                 // remove old policies
-                for (final Policy policy : policies) {
+                for (final Policy policy : policiesForMe) {
                     if (!newPolicies.contains(policy)) {
                         LOG.debug("Remove old policy: {}", policy);
                         policy.removePolicy(ctx.pipeline());
@@ -298,14 +304,14 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
 
                 // add new policies
                 for (final Policy newPolicy : newPolicies) {
-                    if (!policies.contains(newPolicy)) {
+                    if (!policiesForMe.contains(newPolicy)) {
                         LOG.debug("Add new policy: {}", newPolicy);
                         newPolicy.addPolicy(ctx.pipeline());
                     }
                 }
 
-                policies.clear();
-                policies.addAll(newPolicies);
+                policiesForMe.clear();
+                policiesForMe.addAll(newPolicies);
             }
         }
         else {

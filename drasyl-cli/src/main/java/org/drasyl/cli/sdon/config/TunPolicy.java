@@ -110,7 +110,7 @@ public class TunPolicy extends AbstractPolicy {
             return false;
         }
         final TunPolicy tunPolicy = (TunPolicy) o;
-        return netmask == tunPolicy.netmask && Objects.equals(address, tunPolicy.address) && Objects.equals(mapping, tunPolicy.mapping);
+        return Objects.equals(address, tunPolicy.address) && (netmask == tunPolicy.netmask) && Objects.equals(mapping, tunPolicy.mapping);
     }
 
     @Override

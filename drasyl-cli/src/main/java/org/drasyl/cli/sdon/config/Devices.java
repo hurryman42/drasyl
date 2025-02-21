@@ -36,7 +36,7 @@ public class Devices extends LuaTable {
     }
 
     public Devices(LuaTable devices) {
-        for (int i=1; i<=devices.length(); i++) {
+        for (int i = 1; i <= devices.length(); i++) {
             getOrCreateDevice(IdentityPublicKey.of(devices.get(i).tojstring()));
         }
     }
@@ -58,16 +58,34 @@ public class Devices extends LuaTable {
         }
     }
 
+    public Device getOrCreateDevice(final DrasylAddress address, final DrasylAddress controller) {
+        final LuaValue device = get(address.toString());
+        if (device != NIL) {
+            return (Device) device;
+        }
+        else {
+            final Device newDevice = new Device(address, controller);
+            set(address.toString(), newDevice);
+            return newDevice;
+        }
+    }
+
     public Collection<Device> getDevices() {
         final Set<Device> devices = new HashSet<>();
         final LuaValue[] keys = keys();
         for (final LuaValue key : keys) {
-            devices.add((Device) get(key));
+            if (get(key) != NIL) {
+                devices.add((Device) get(key));
+            }
         }
         return devices;
     }
 
     public void addDevice(final Device device) {
         set(device.address().toString(), device);
+    }
+
+    public void removeDevice(final Device device) {
+        set(device.address().toString(), NIL);
     }
 }

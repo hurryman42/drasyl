@@ -43,7 +43,6 @@ import org.drasyl.cli.sdon.config.Devices;
 import org.drasyl.cli.sdon.config.Network;
 import org.drasyl.cli.sdon.config.NetworkNode;
 import org.drasyl.cli.sdon.config.Policy;
-import org.drasyl.cli.sdon.config.SubControllerPolicy;
 import org.drasyl.cli.sdon.event.SdonMessageReceived;
 import org.drasyl.cli.sdon.message.ControllerHello;
 import org.drasyl.cli.sdon.message.DeviceHello;
@@ -54,7 +53,6 @@ import org.drasyl.util.logging.LoggerFactory;
 import org.drasyl.util.network.Subnet;
 import org.luaj.vm2.LuaString;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.StringReader;
@@ -64,7 +62,6 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -91,7 +88,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
     private final java.security.PublicKey publicKey;
     private final PrivateKey privateKey;
     private final List<String> certificates;
-    private X509Certificate myCert;
+    private final X509Certificate myCert;
     private Subnet mySubnet;
     private State state;
     private final Map<DrasylAddress, String> subControllerSubnets; // is this the best way to keep track of the controller's sub-controllers?
@@ -101,13 +98,17 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                           final Devices devices,
                           final java.security.PublicKey publicKey,
                           final PrivateKey privateKey,
-                          final List<String> certificates) {
+                          final List<String> certificates,
+                          final X509Certificate myCert,
+                          final Subnet mySubnet) {
         this.out = requireNonNull(out);
         this.network = requireNonNull(network);
         this.devices = requireNonNull(devices);
         this.publicKey = requireNonNull(publicKey);
         this.privateKey = requireNonNull(privateKey);
         this.certificates = requireNonNull(certificates);
+        this.myCert = requireNonNull(myCert);
+        this.mySubnet = requireNonNull(mySubnet);
         this.subControllerSubnets = new HashMap<>();
     }
 
@@ -115,8 +116,10 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                                  final Network network,
                                  final java.security.PublicKey publicKey,
                                  final PrivateKey privateKey,
-                                 final List<String> certificates) {
-        this(out, network, new Devices(), publicKey, privateKey, certificates);
+                                 final List<String> certificates,
+                                 final X509Certificate myCert,
+                                 final Subnet mySubnet) {
+        this(out, network, new Devices(), publicKey, privateKey, certificates, myCert, mySubnet);
     }
 
     @Override
@@ -145,7 +148,6 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                     //LOG.debug("Starting Fixed Schedule!");
                     // call callback
                     network.callCallback(devices); // TODO: add permissions of the controller? (what subnet it controls)
-
                     //LOG.debug("Finished calling Callback.");
 
                     // do matchmaking
@@ -185,32 +187,15 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                         if (node != null) {
                             policies = node.createPolicies();
 
-                            final String myCertString = certificates.get(0);
-                            final CertificateFactory cf = CertificateFactory.getInstance("X.509");
-                            myCert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(myCertString.getBytes()));
+                            // create smallerSubnet (is used for SubControllerPolicy) & create devicePolicies
+                            final String smallerSubnetString = mySubnet.addressString() + "/" + (mySubnet.netmaskLength() + 8); // FIXME: +8 probably not always the best
+                            final Subnet smallerSubnet = new Subnet(smallerSubnetString);
 
-                            String myCertSubjectString = myCert.getSubjectX500Principal().toString();
-                            int startIndex = myCertSubjectString.indexOf("CN=");
-                            if (startIndex != -1) {
-                                startIndex += 3;
-                                int endIndex = myCertSubjectString.indexOf(",", startIndex);
-                                if (endIndex == -1) {
-                                    endIndex = myCertSubjectString.length();
-                                }
-                                myCertSubjectString = myCertSubjectString.substring(startIndex, endIndex).trim();
-                                mySubnet = new Subnet(myCertSubjectString);
+                            final Set<Policy> devicePolicies = device.createPolicies(smallerSubnet, ctx.channel().localAddress().toString());
 
-                                // the smallerSubnet String is always created; but only when a devicePolicy with this subnet is created, it is added to subControllerSubnets
-                                final String smallerSubnetString = mySubnet.addressString() + "/" + (mySubnet.netmaskLength() + 8); // FIXME: + 8 probably not the best always
-
-                                final Set<Policy> devicePolicies = device.createPolicies(smallerSubnetString, ctx.channel().localAddress().toString());
-                                if (!devicePolicies.isEmpty()) {
-                                    subControllerSubnets.put(device.address(), smallerSubnetString);
-                                    policies.addAll(devicePolicies);
-                                }
-                            }
-                            else {
-                                throw new IOException("Error reading the subnet out of the certificate!");
+                            if (!devicePolicies.isEmpty()) {
+                                subControllerSubnets.put(device.address(), smallerSubnetString);
+                                policies.addAll(devicePolicies);
                             }
                         }
                         else {
@@ -260,6 +245,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                         channel.closeFuture().addListener((ChannelFutureListener) future -> {
                             device.setOffline();
                             out.println("Device " + sender + " deregistered.");
+                            devices.removeDevice(device);
                         });
 
                         device.setOnline();
@@ -270,7 +256,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                         channel.writeAndFlush(controllerHello).addListener(FIRE_EXCEPTION_ON_FAILURE);
                     }
                 }
-                else { // CSR will be signed, offloaded devices get controlledPolicy as a goodbye from the controller
+                else { // sign CSR, send new certificate to the controller & send controlledPolicy to all offloaded devices as a goodbye from the controller
                     final String csrString = deviceHello.csr();
 
                     final PEMParser pemParserCSR = new PEMParser(new StringReader(csrString));
@@ -284,7 +270,9 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
 
                     // get subject out of the CSR & check if it is right
                     final X500Name csrSubject = csr.getSubject();
+                    out.println("------------------------------------------------------------------------------------------------");
                     out.println("Subject of the CSR is: " + csrSubject);
+                    out.println("------------------------------------------------------------------------------------------------");
                     final String csrSubjectString = csrSubject.toString();
                     int startIndex = csrSubjectString.indexOf("CN=");
                     if (startIndex != -1) {
@@ -294,7 +282,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                             endIndex = csrSubjectString.length();
                         }
                         final String subnetAddress = csrSubjectString.substring(startIndex, endIndex).trim();
-                        out.println(subnetAddress);
+                        //out.println(subnetAddress); // DEBUG
                         if (!subControllerSubnets.get(sender).equals(subnetAddress)) {
                             throw new CertificateException("Wrong subnet address in CSR!");
                         }
@@ -311,12 +299,13 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                     final X509Certificate certificate = new JcaX509CertificateConverter().getCertificate(certBuilder.build(signer));
 
                     //final List<String> certificates = loadCertificates("chain.crt"); // the loading of the certificates is now done in the SdonControllerCommand
-                    List<String> certificatesWithNew = new ArrayList<>();
+                    final List<String> certificatesWithNew = new ArrayList<>();
                     certificatesWithNew.add(convertCertToPem(certificate)); // important: the new certificate has to be added at the beginning of the cert-list (the cacert is always the last)
                     certificatesWithNew.addAll(certificates);
 
-                    final String smallerSubnetString = mySubnet.addressString() + "/" + (mySubnet.netmaskLength() + 8); // FIXME: + 8 probably not the best always
-                    final Set<Policy> devicePolicies = device.createPolicies(smallerSubnetString, ctx.channel().localAddress().toString());
+                    final String smallerSubnetString = mySubnet.addressString() + "/" + (mySubnet.netmaskLength() + 8); // FIXME: +8 probably not always the best
+                    final Subnet smallerSubnet = new Subnet(smallerSubnetString);
+                    final Set<Policy> devicePolicies = device.createPolicies(smallerSubnet, ctx.channel().localAddress().toString());
                     final ControllerHello response = new ControllerHello(devicePolicies, certificatesWithNew);
 
                     final DrasylChannel subControllerChannel = ((DrasylServerChannel) ctx.channel()).getChannels().get(sender);
@@ -325,8 +314,9 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
 
                     // send goodbye message to all the offloaded devices
                     final ControllerHello goodbyeMsg = new ControllerHello(Set.of(new ControlledPolicy(sender)), certificates);
-                    Collection<Device> devs = device.myDevices().getDevices();
+                    final Collection<Device> devs = device.myDevices().getDevices();
                     for (Device dev : devs) {
+                        devices.removeDevice(dev);
                         final DrasylChannel goodbyeChannel = ((DrasylServerChannel) ctx.channel()).getChannels().get(dev.address());
                         LOG.debug("Send {} to {}.", goodbyeMsg.toString().replace("\n", ""), dev.address());
                         goodbyeChannel.writeAndFlush(goodbyeMsg).addListener(FIRE_EXCEPTION_ON_FAILURE);
