@@ -147,7 +147,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                 try {
                     //LOG.debug("Starting Fixed Schedule!");
                     // call callback
-                    network.callCallback(devices); // TODO: add permissions of the controller? (what subnet it controls)
+                    network.callCallback(devices); // TODO: add permissions of the controller? (what subnet it controls, how many max devices, etc.)
                     //LOG.debug("Finished calling Callback.");
 
                     // do matchmaking

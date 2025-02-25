@@ -31,6 +31,8 @@ import org.drasyl.channel.DrasylServerChannel;
 import org.drasyl.cli.sdon.config.ControlledPolicy;
 import org.drasyl.cli.sdon.config.Device;
 import org.drasyl.cli.sdon.config.Devices;
+import org.drasyl.cli.sdon.config.Network;
+import org.drasyl.cli.sdon.config.NetworkConfig;
 import org.drasyl.cli.sdon.config.SubControllerPolicy;
 import org.drasyl.cli.sdon.config.Policy;
 import org.drasyl.cli.sdon.config.TunPolicy;
@@ -79,10 +81,11 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
     public X509Certificate myCert;
     public String myCertAsString;
     public List<String> myCertificateStrings;
-    private final Map<String, Object> facts;
+    public final Map<String, Object> facts;
     State state;
     public final Set<Policy> policiesForMe = new HashSet<>();
     public final Set<Policy> policiesForMyDevices = new HashSet<>();
+    public Network network;
 
     public SdonDeviceHandler(final PrintStream out,
                              final IdentityPublicKey controller,
@@ -238,15 +241,18 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                         }
                         else if (policy instanceof SubControllerPolicy) { // the device is a sub-controller --> it receives SubControllerPolicies & sends ControlledPolicies to its devices
                             final SubControllerPolicy subControllerPolicy = (SubControllerPolicy) policy;
+                            // sub-controller instantiation (create CSR & send it to controller) is done by the SubControllerPolicyHandler (called on the first SubControllerPolicy that is received)
 
-                            // the sub-controller instantiation (create CSR & send it to controller) is now done by the SubControllerPolicyHandler (called on the first SubControllerPolicy that is received)
-                            // the sub-controller receives its own certificate only once and then the chain without it (until the controller's certificate)
+                            // TODO: check if maximum amount of devices the sub-controller can hold has changed --> if so, change in facts:
+                            //facts.replace("sub-controller max devices", actualNr);
+
+                            // the sub-controller receives its own certificate only once & then the chain without it (until the controller's certificate)
                             final String myNewCertificateString = certificates.get(0);
                             out.println("Received certificate: " + myNewCertificateString.replace("\n", "")); // DEBUG
                             if (myCertificateStrings == null) {
                                 myCertificateStrings = certificates;
                             }
-                            // to detect the one time when the sub-controller's certificate is sent, it checks, whether the certificate candidate was already sent or is in the already sent certificate chain
+                            // to detect the one time the actual sub-controller's certificate is received, it is checked, whether the certificate candidate was already sent or is in the already sent certificate chain
                             if (!myNewCertificateString.equals(myCertAsString) && !myCertificateStrings.contains(myNewCertificateString)) {
                                 myCertificateStrings = certificates;
                                 myCertAsString = myNewCertificateString;
@@ -278,6 +284,9 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                                     }
                                 });
                             }
+
+                            // TODO: do we need a callback for the sub-controller-net?
+                            //network.callCallback(myDevices);
                         }
                     }
                 }

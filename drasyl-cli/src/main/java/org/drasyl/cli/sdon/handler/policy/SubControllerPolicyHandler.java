@@ -76,18 +76,21 @@ public class SubControllerPolicyHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void handlerAdded(final ChannelHandlerContext ctx) throws IOException, OperatorCreationException, CertificateException {
+        // get DeviceHandler & add sub-controller facts
         final SdonDeviceHandler deviceHandler = ctx.pipeline().get(SdonDeviceHandler.class);
+        //deviceHandler.facts.put("sub-controller current device nr", policy.devices().size());
+        final int maxDevices = 2; // TODO: set this dynamically (e.g. based on sub-controller capacity or specification from controller)
+        deviceHandler.facts.put("max_devices", maxDevices);
 
         System.out.println("------------------------------------------------------------------------------------------------");
         System.out.println("I am a SUB-CONTROLLER with devices: " + policy.devices().toString());
+        System.out.println("The maximum number of devices I can manage is: " + maxDevices);
         System.out.println("My controller is: " + policy.controller());
 
-        // create CSR
+        // create & send CSR in DeviceHello
         final String csrAsString = createCSR(deviceHandler.publicKey, deviceHandler.privateKey, new Subnet(policy.subnetString()));
         final DeviceHello subControllerCSR = new DeviceHello(Map.of(), Set.of(), csrAsString);
         System.out.println("Generated DeviceHello message with CSR. Sending to controller now.");
-
-        // send the CSR message
         ((DrasylServerChannel) ctx.channel()).serve(policy.controller()).addListener((ChannelFutureListener) future -> {
             if (future.isSuccess()) {
                 final Channel channelToController = future.channel();
@@ -101,20 +104,19 @@ public class SubControllerPolicyHandler extends ChannelInboundHandlerAdapter {
 
         try {
             // read myFunctionFileName & create a NetworkConfig & other variables with it
-            File configFile = new File(policy.myFunctionFileName());
-            NetworkConfig config = NetworkConfig.parseFile(configFile);
-            Network network = config.network();
-            Devices devices = new Devices();
+            final File configFile = new File(policy.myFunctionFileName());
+            final NetworkConfig config = NetworkConfig.parseFile(configFile);
+            deviceHandler.network = config.network();
+            final Devices devices = new Devices();
             for (final DrasylAddress deviceAddress : policy.devices()) {
-                Device device = devices.getOrCreateDevice(deviceAddress, policy.address());
+                final Device device = devices.getOrCreateDevice(deviceAddress, policy.address());
                 device.setOnline();
             }
             LOG.debug("Read SubControllerNetworkConfig out of file.");
 
-
             // do matchmaking
             final Set<Device> assignedDevices = new HashSet<>();
-            final Map<LuaString, NetworkNode> nodes = network.getNodes();
+            final Map<LuaString, NetworkNode> nodes = deviceHandler.network.getNodes();
             for (final Map.Entry<LuaString, NetworkNode> entry : nodes.entrySet()) {
                 final NetworkNode node = entry.getValue();
 
@@ -167,7 +169,7 @@ public class SubControllerPolicyHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void handlerRemoved(final ChannelHandlerContext ctx) {
         // send reset message to all my devices
-        ControllerHello resetMsg = new ControllerHello(Set.of(), List.of());
+        final ControllerHello resetMsg = new ControllerHello(Set.of(), List.of());
         for (DrasylAddress devAddress : policy.devices()) {
             ((DrasylServerChannel) ctx.channel()).serve(devAddress).addListener((ChannelFutureListener) future -> {
                 if (future.isSuccess()) {

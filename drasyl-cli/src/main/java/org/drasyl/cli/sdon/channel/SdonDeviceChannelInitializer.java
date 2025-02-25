@@ -87,6 +87,6 @@ public class SdonDeviceChannelInitializer extends AbstractChannelInitializer {
         osFacts.put("version", System.getProperty("os.version"));
         facts.put("os", osFacts);
 
-        return Map.of("sdon", facts);
+        return new HashMap<>(Map.of("sdon", facts));
     }
 }

@@ -25,6 +25,7 @@ import io.netty.util.internal.StringUtil;
 import org.luaj.vm2.LuaBoolean;
 import org.luaj.vm2.LuaDouble;
 import org.luaj.vm2.LuaInteger;
+import org.luaj.vm2.LuaNumber;
 import org.luaj.vm2.LuaString;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
@@ -56,6 +57,9 @@ public class LuaHelper {
         for (final Entry<String, Object> entry : map.entrySet()) {
             if (entry.getValue() instanceof String) {
                 table.set(LuaString.valueOf(entry.getKey()), LuaString.valueOf((String) entry.getValue()));
+            }
+            else if (entry.getValue() instanceof Number) {
+                table.set(LuaString.valueOf(entry.getKey()), LuaNumber.valueOf((Integer) entry.getValue()));
             }
             else if (entry.getValue() instanceof Map) {
                 table.set(LuaString.valueOf(entry.getKey()), createTable((Map<String, Object>) entry.getValue()));

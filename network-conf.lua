@@ -16,12 +16,13 @@ net:add_node("n3", {ip="10.3.0.3/24"})
 
 net:set_callback(
     function(my_net, devices) -- set_callback is called every 5000ms
-        --print("callback started!") --DEBUG printing
         our_devices = {}
         nr_sub_controllers = 0
+        --print("callback started!") --DEBUG printing
         --print(inspect(devices)) -- DEBUG printing
         --print("inspected devices") -- DEBUG printing
 
+        -- sort devices in the local variables
         for id, device in pairs(devices) do
             --print("in loop of devices") -- DEBUG printing
             --print(inspect(device)) -- DEBUG printing
@@ -31,6 +32,17 @@ net:set_callback(
                 nr_sub_controllers = nr_sub_controllers + 1
                 table.insert(our_devices, device)
                 controller_of_devices[device] = "" -- TODO: this won't work for a sub_controller of a sub_controller, but for that we would need to know "our" address
+
+                -- check if sub_controller has too many devices & remove them then (from sub_controller & add them to our_devices)
+                needs = device:get_sub_controller_needs()
+                print(device.address .. " can handle " .. tostring(needs) .. " more devices.")
+                if needs < 0 then
+                    new_devices = device:remove_devices(needs * -1)
+                    print("handing back: " .. inspect(new_devices))
+                    for id, device in pairs(new_devices) do
+                        table.insert(our_devices, device)
+                    end
+                end
             elseif device.controller_address ~= "" then -- device controlled by sub-controller
                 controller_of_devices[device] = device.controller_address
             elseif device.controller_address == "" then -- device controlled by "us" (top-level controller)
@@ -73,23 +85,29 @@ net:set_callback(
             end
         end
         print("--------------------") -- DEBUG printing
-
-        --nr_managed_devs = #our_devices + nr_sub_controllers
         print(#our_devices .. " = " .. (#our_devices - nr_sub_controllers) .. " devices + " .. nr_sub_controllers .. " sub-controllers") -- DEBUG printing
         print("just_starting = " .. tostring(just_starting))
+
 
         if #our_devices >= HIGH_WATERMARK then -- sub controller needed
             just_starting = false
             print("controller is preparing to offload...")
             print("--------------------") -- DEBUG printing
 
-            -- elect sub controller (for now take simply the first)
-            sub_controller = our_devices[1]
-            --table.remove(our_devices, 1) -- sub_controller are still part of our_devices
-            --sub_controller = elect_sub_controller(devices) -- this java function needs a good score to be calculated
-
-            --print("selected sub_controller: " .. inspect(sub_controller)) -- DEBUG printing
-            print("selected sub_controller: " .. sub_controller.address) -- DEBUG printing
+            -- elect sub-controller (or take an existing one)
+            if nr_sub_controllers == 0 then
+                sub_controller = our_devices[1]
+                --table.remove(our_devices, 1) -- sub_controller are still part of our_devices
+                --sub_controller = elect_sub_controller(devices) -- this java function needs a good score to be calculated
+                print("selected sub_controller: " .. sub_controller.address) -- DEBUG printing
+            elseif nr_sub_controllers > 0 then
+                for id, device in pairs(devices) do
+                    if device.is_sub_controller == true then
+                        sub_controller = device
+                    end
+                end
+                print("existing sub_controller: " .. sub_controller.address) -- DEBUG printing
+            end
 
             -- elect devices to be offloaded (for now just take the first n devices)
             devices_to_handover = {}
@@ -102,19 +120,18 @@ net:set_callback(
                 our_devices[2].controller_address = sub_controller
                 table.remove(our_devices, 2)
             end
-            -- devices_to_handover = elect_devices_to_handover(devices, nr_managed_devs - LOW_WATERMARK - 1)
+            -- devices_to_handover = elect_devices_to_handover(devices, #our_devices - (LOW_WATERMARK + 1))
 
             print("--------------------") -- DEBUG printing
             for id, device in pairs(devices_to_handover) do print("device to handover: " .. device.address) end -- DEBUG printing
             for i, device in ipairs(our_devices) do print("remaining our_device: " .. device.address) end -- DEBUG printing
-            --print(inspect(devices_to_handover)) -- DEBUG printing
 
             devices_to_handover = create_devices(devices_to_handover) -- make the LuaTable to a Devices object
             print("--------------------") -- DEBUG printing
             print("controller is offloading...") -- DEBUG printing
             print("--------------------") -- DEBUG printing
 
-            sub_controller:make_sub_controller(devices_to_handover)
+            sub_controller:make_sub_controller(devices_to_handover) -- make_sub_controller is also add_device (to sub_controller) if the device is already a sub_controller
 
         elseif (#our_devices <= LOW_WATERMARK) and (just_starting == false) then -- no sub-controller needed anymore, decommission it: (sub-)controller removes policies (stops sending them) --> devices go back to standard behaviour of trying to register at the top-level controller
             print("decommissioning a sub-controller")
@@ -137,10 +154,10 @@ net:set_callback(
             end
             for device, amount in pairs(sub_controllers_device_count) do print(device.address .. " is a sub-controller & has " .. amount .. " devices to manage.") end -- DEBUG printing
 
-            -- decommission sub-controllers until the nr_managed_devs is above the LOW_WATERMARK
+            -- decommission sub-controllers until the #our_devices is above the LOW_WATERMARK
             while #our_devices <= LOW_WATERMARK do
                 -- find the sub_controller with the fewest devices to manage
-                lowest_amount = 9223372036854775807
+                lowest_amount = 9223372036854775807 -- infinity
                 for device, amount in pairs(sub_controllers_device_count) do
                     if amount <= lowest_amount then
                         sub_controller = device
@@ -155,10 +172,7 @@ net:set_callback(
                 table.insert(our_devices, sub_controller)
                 for id, device in pairs(new_devices) do
                     table.insert(our_devices, device)
-                    controller_of_devices[id] = nil -- FIXME: doesn't have the right effect
                 end
-
-                --nr_managed_devs = #our_devices + nr_sub_controllers
                 print("--------------------") -- DEBUG printing
             end
 
