@@ -33,6 +33,7 @@ import org.luaj.vm2.LuaValue;
         @JsonSubTypes.Type(LinkPolicy.class),
         @JsonSubTypes.Type(SubControllerPolicy.class),
         @JsonSubTypes.Type(ControlledPolicy.class),
+        @JsonSubTypes.Type(RunPolicy.class)
 })
 
 public interface Policy {

@@ -32,7 +32,6 @@ import org.drasyl.cli.sdon.config.ControlledPolicy;
 import org.drasyl.cli.sdon.config.Device;
 import org.drasyl.cli.sdon.config.Devices;
 import org.drasyl.cli.sdon.config.Network;
-import org.drasyl.cli.sdon.config.NetworkConfig;
 import org.drasyl.cli.sdon.config.SubControllerPolicy;
 import org.drasyl.cli.sdon.config.Policy;
 import org.drasyl.cli.sdon.config.TunPolicy;

@@ -56,6 +56,9 @@ public class NetworkNode extends LuaTable {
             ip = LuaValue.valueOf(network.getNextIp());
         }
         set("ip", ip);
+
+        // run
+        set("run", params.get("run"));
     }
 
     @Override
@@ -128,6 +131,12 @@ public class NetworkNode extends LuaTable {
 
             final Policy tunPolicy = new TunPolicy(ipAddress, ipNetmask, mapping);
             policies.add(tunPolicy);
+
+            final LuaValue runArgument = get("run");
+            if (runArgument != NIL) {
+                final Policy runPolicy = new RunPolicy(runArgument.tojstring());
+                policies.add(runPolicy);
+            }
 
             return policies;
         }

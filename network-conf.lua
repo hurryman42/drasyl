@@ -10,7 +10,7 @@ local controller_of_devices = {} -- mapping of device to its controller
 local just_starting = true -- boolean to make sure the controller does not try to decommission a sub_controller when there was one created (probably a better way to do this for multiple sub_controllers)
 
 net = create_network()
-net:add_node("n1", {ip="10.1.0.1/24"})
+net:add_node("n1", {ip="10.1.0.1/24", run="python3 web-server.py"})
 net:add_node("n2", {ip="10.2.0.2/24"})
 net:add_node("n3", {ip="10.3.0.3/24"})
 

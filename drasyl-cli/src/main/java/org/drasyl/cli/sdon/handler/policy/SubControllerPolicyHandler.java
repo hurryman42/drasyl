@@ -35,7 +35,6 @@ import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
 import org.drasyl.channel.DrasylServerChannel;
 import org.drasyl.cli.sdon.config.Device;
 import org.drasyl.cli.sdon.config.Devices;
-import org.drasyl.cli.sdon.config.Network;
 import org.drasyl.cli.sdon.config.NetworkConfig;
 import org.drasyl.cli.sdon.config.NetworkNode;
 import org.drasyl.cli.sdon.config.Policy;
