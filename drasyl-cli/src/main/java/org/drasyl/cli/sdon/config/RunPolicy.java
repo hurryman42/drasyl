@@ -22,13 +22,11 @@
 package org.drasyl.cli.sdon.config;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.netty.channel.ChannelPipeline;
 import io.netty.util.internal.StringUtil;
 import org.drasyl.cli.sdon.handler.policy.RunPolicyHandler;
 
-import java.io.File;
 import java.util.Objects;
 
 import static java.util.Objects.requireNonNull;

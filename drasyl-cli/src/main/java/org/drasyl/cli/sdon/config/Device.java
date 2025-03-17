@@ -58,6 +58,7 @@ public class Device extends LuaTable {
         set("remove_devices", new RemoveDevicesFromSubControllerFunction());
         set("set_my_function", new SetFunction());
         set("get_sub_controller_needs", new GetSubControllerDeviceNeeds());
+        set("count_my_devices", new CountMyDevicesFunction());
     }
 
     public Device(final DrasylAddress address) {
@@ -73,6 +74,7 @@ public class Device extends LuaTable {
         set("remove_devices", new RemoveDevicesFromSubControllerFunction());
         set("set_my_function", new SetFunction());
         set("get_sub_controller_needs", new GetSubControllerDeviceNeeds());
+        set("count_my_devices", new CountMyDevicesFunction());
     }
 
     @Override
@@ -309,6 +311,14 @@ public class Device extends LuaTable {
                 System.out.println("The given LuaTable is not of Device type, instead " + subControllerTable.getClass());
             }
             return NIL;
+        }
+    }
+
+    static class CountMyDevicesFunction extends OneArgFunction {
+        @Override
+        public LuaValue call(final LuaValue deviceArg) {
+            final Device device = (Device) deviceArg.checktable();
+            return LuaValue.valueOf(device.myDevices().countDevices());
         }
     }
 }

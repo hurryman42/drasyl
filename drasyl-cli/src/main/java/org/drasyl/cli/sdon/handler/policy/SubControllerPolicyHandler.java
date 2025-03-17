@@ -78,13 +78,14 @@ public class SubControllerPolicyHandler extends ChannelInboundHandlerAdapter {
         // get DeviceHandler & add sub-controller facts
         final SdonDeviceHandler deviceHandler = ctx.pipeline().get(SdonDeviceHandler.class);
         //deviceHandler.facts.put("sub-controller current device nr", policy.devices().size());
-        final int maxDevices = 2; // TODO: set this dynamically (e.g. based on sub-controller capacity or specification from controller)
+        final int maxDevices = 10; // TODO: set this dynamically (e.g. based on sub-controller capacity or specification from controller; OR at least read it from the sub-controller-config.lua-script!)
         deviceHandler.facts.put("max_devices", maxDevices);
 
         System.out.println("------------------------------------------------------------------------------------------------");
         System.out.println("I am a SUB-CONTROLLER with devices: " + policy.devices().toString());
         System.out.println("The maximum number of devices I can manage is: " + maxDevices);
         System.out.println("My controller is: " + policy.controller());
+        System.out.println("------------------------------------------------------------------------------------------------");
 
         // create & send CSR in DeviceHello
         final String csrAsString = createCSR(deviceHandler.publicKey, deviceHandler.privateKey, new Subnet(policy.subnetString()));

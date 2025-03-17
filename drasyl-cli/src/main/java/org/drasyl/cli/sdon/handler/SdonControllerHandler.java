@@ -184,6 +184,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                             }
                         }
                         final Set<Policy> policies;
+                        // FIXME: if there are not enough nodes for all the devices, the policies will not be created at all --> device goes back to primary controller, gets maybe directly offloaded --> chaos!
                         if (node != null) {
                             policies = node.createPolicies();
 
@@ -204,7 +205,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                         //LOG.debug("Created Policies and Certificates for " + device.address().toString());
 
                         final ControllerHello controllerHello = new ControllerHello(policies, certificates);
-                        LOG.debug("Send {} to {}.", controllerHello.toString().replace("\n", ""), device.address());
+                        LOG.debug("Send to {}: {}", device.address(), controllerHello.toString().replace("\n", ""));
                         final DrasylChannel channel = ((DrasylServerChannel) ctx.channel()).getChannels().get(device.address());
                         if (channel != null) {
                             channel.writeAndFlush(controllerHello).addListener(FIRE_EXCEPTION_ON_FAILURE);
@@ -229,7 +230,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
             final DrasylAddress sender = ((SdonMessageReceived) evt).address();
             final SdonMessage msg = ((SdonMessageReceived) evt).msg();
             //LOG.trace("Received from `{}`: {}`", sender, msg);
-            LOG.debug("Received from `{}`: {}`", sender, msg.toString().replace("\n", ""));
+            LOG.debug("Received from {}: {}`", sender, msg.toString().replace("\n", ""));
 
             if (msg instanceof DeviceHello) {
                 final DeviceHello deviceHello = (DeviceHello) msg;

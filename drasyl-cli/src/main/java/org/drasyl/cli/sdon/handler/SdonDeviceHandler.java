@@ -153,6 +153,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
         if (evt instanceof SdonMessageReceived) {
             final DrasylAddress sender = ((SdonMessageReceived) evt).address();
             final SdonMessage msg = ((SdonMessageReceived) evt).msg();
+            //out.println("----------------------------------------------------------------------------------------------");
             LOG.debug("Received from `{}`: {}", sender, msg.toString().replace("\n", ""));
 
             if (msg instanceof ControllerHello) { // && sender.equals(controller)
@@ -160,7 +161,6 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                 final List<String> certificates = controllerHello.certificates();
 
                 if (!certificates.isEmpty() && !controllerHello.policies().isEmpty()) {
-                    out.println("----------------------------------------------------------------------------------------------");
                     // load rootCertificate from file & check whether it equals the last certificate in the message
                     final String rootCertFilePath = "cacert.crt"; // TODO: make this more dynamic (command inputs?)
                     final String rootCertString = Files.readString(Path.of(rootCertFilePath));

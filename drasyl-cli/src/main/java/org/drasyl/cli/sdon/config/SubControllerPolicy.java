@@ -44,7 +44,7 @@ public class SubControllerPolicy extends AbstractPolicy {
     private String myFunctionFileName;
 
     // TODO: add callback function from the lua-script and make sure its called periodically
-    // TODO: maybe add a maximum number of devices that the sub-controller is allowed to manage? Or add that as a "permission" in the certificate? --> in the function of the sub-controller!
+    // TODO: maybe add a maximum number of devices that the sub-controller is allowed to manage? Or/and add that as a "permission" in the certificate? --> in the function of the sub-controller!
 
     @JsonCreator
     public SubControllerPolicy(@JsonProperty("address") final DrasylAddress address,

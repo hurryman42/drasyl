@@ -81,6 +81,11 @@ public class Devices extends LuaTable {
         return devices;
     }
 
+    public int countDevices() {
+        final LuaValue[] keys = keys();
+        return keys.length;
+    }
+
     public void addDevice(final Device device) {
         set(device.address().toString(), device);
     }

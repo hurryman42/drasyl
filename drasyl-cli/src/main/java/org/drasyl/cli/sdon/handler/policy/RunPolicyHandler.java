@@ -48,7 +48,7 @@ public class RunPolicyHandler extends ChannelInboundHandlerAdapter {
             LOG.trace("Execute: {}", String.join(" ", policy.command));
             final Process process = Runtime.getRuntime().exec(policy.command);
             System.out.println(process.pid());
-            Thread watcherThread = getWatcherThread(process);
+            final Thread watcherThread = getWatcherThread(process);
             watcherThread.start();
             final int exitCode = process.waitFor();
             watcherThread.join();
@@ -61,7 +61,7 @@ public class RunPolicyHandler extends ChannelInboundHandlerAdapter {
     }
 
     private static Thread getWatcherThread(Process process) {
-        Thread watcherThread = new Thread(() -> {
+        final Thread watcherThread = new Thread(() -> {
             while (true) {
                 if (!process.isAlive()) {
                     System.out.println("The process has finished!!!");
