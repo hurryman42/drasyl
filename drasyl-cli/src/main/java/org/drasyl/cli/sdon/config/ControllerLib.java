@@ -51,8 +51,9 @@ public class ControllerLib extends TwoArgFunction {
         env.set("inspect", new InspectFunction());
         env.set("get_network", new GetNetworkFunction());
         env.set("elect_sub_controller", new ElectSubControllerFunction());
-        env.set("elect_devices_to_handover", new ElectDevicesToHandoverFunction());
+        env.set("select_devices_to_handover", new SelectDevicesToHandoverFunction());
         env.set("create_devices", new CreateDevicesFunction());
+        env.set("set_high_watermark", new SetHighWatermarkFunction());
         return library;
     }
 
@@ -119,7 +120,7 @@ public class ControllerLib extends TwoArgFunction {
         }
     }
 
-    static class ElectDevicesToHandoverFunction extends TwoArgFunction {
+    static class SelectDevicesToHandoverFunction extends TwoArgFunction {
         @Override
         public LuaValue call(final LuaValue devicesArg, final LuaValue amountArg) {
             // just take the first best devices
@@ -140,7 +141,7 @@ public class ControllerLib extends TwoArgFunction {
         public Devices call(final LuaValue devicesArg) {
             final Devices devices = new Devices();
             final LuaTable devicesTable = devicesArg.checktable();
-            // TODO: check first, whether the array or the hash part (or both) of the LuaTable are filled
+            // TODO: check first, whether the array or the hash part (or both) of the LuaTable is filled
             for (int i = 1; i <= devicesTable.length(); i++) {
                 try {
                     final Device device = (Device) devicesTable.get(i);
@@ -151,6 +152,14 @@ public class ControllerLib extends TwoArgFunction {
                 }
             }
             return devices;
+        }
+    }
+
+    static class SetHighWatermarkFunction extends OneArgFunction {
+        @Override
+        public LuaValue call(final LuaValue deviceCount) {
+            int device_count = deviceCount.toint();
+            return LuaValue.valueOf((int) Math.ceil(Math.sqrt(device_count)));
         }
     }
 }

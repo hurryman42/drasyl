@@ -91,7 +91,7 @@ net:set_callback(
                 if controller ~= nil then
                     if controller == "" then
                         if device.is_sub_controller == true then
-                            print(device.address .. " is sub-controller.") -- DEBUG printing
+                            print(device.address .. " is sub-controller with " .. device:count_my_devices() .. " devices.") -- DEBUG printing
                         else
                             print(device.address .. " has standard controller.") -- DEBUG printing
                         end
@@ -158,7 +158,7 @@ net:set_callback(
                 our_devices[index].controller_address = sub_controller
                 table.remove(our_devices, index)
             end
-            -- devices_to_handover = elect_devices_to_handover(devices, #our_devices - (LOW_WATERMARK + 1))
+            -- devices_to_handover = select_devices_to_handover(devices, #our_devices - (LOW_WATERMARK + 1))
 
             -- DEBUG printing
             print("--------------------") -- DEBUG printing
