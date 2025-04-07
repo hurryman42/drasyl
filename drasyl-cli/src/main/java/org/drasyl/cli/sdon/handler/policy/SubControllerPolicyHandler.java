@@ -48,7 +48,9 @@ import org.drasyl.util.logging.LoggerFactory;
 import org.drasyl.util.network.Subnet;
 import org.luaj.vm2.LuaString;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
@@ -57,7 +59,6 @@ import java.security.Security;
 import java.security.cert.CertificateException;
 import java.util.Base64;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -77,13 +78,19 @@ public class SubControllerPolicyHandler extends ChannelInboundHandlerAdapter {
     public void handlerAdded(final ChannelHandlerContext ctx) throws IOException, OperatorCreationException, CertificateException {
         // get DeviceHandler & add sub-controller facts
         final SdonDeviceHandler deviceHandler = ctx.pipeline().get(SdonDeviceHandler.class);
-        //deviceHandler.facts.put("sub-controller current device nr", policy.devices().size());
-        final int maxDevices = 10; // TODO: set this dynamically (e.g. based on sub-controller capacity or specification from controller; OR at least read it from the sub-controller-config.lua-script!)
+        deviceHandler.isSubController = true;
+        deviceHandler.nrIntendedDevices = policy.devices().size();
+
+        // fallback solution for when the sub-controller network config file does not specify the maxDevices & minDevices properly:
+        int maxDevices = 10;
+        int minDevices = 1;
         deviceHandler.facts.put("max_devices", maxDevices);
+        deviceHandler.facts.put("min_devices", minDevices);
 
         System.out.println("------------------------------------------------------------------------------------------------");
-        System.out.println("I am a SUB-CONTROLLER with devices: " + policy.devices().toString());
-        System.out.println("The maximum number of devices I can manage is: " + maxDevices);
+        System.out.println("I am a SUB-CONTROLLER!");
+        System.out.println("Intended devices: " + policy.devices().toString());
+        System.out.println("Actual devices: " + deviceHandler.devices.getDeviceAddresses().toString());
         System.out.println("My controller is: " + policy.controller());
         System.out.println("------------------------------------------------------------------------------------------------");
 
@@ -94,7 +101,7 @@ public class SubControllerPolicyHandler extends ChannelInboundHandlerAdapter {
         ((DrasylServerChannel) ctx.channel()).serve(policy.controller()).addListener((ChannelFutureListener) future -> {
             if (future.isSuccess()) {
                 final Channel channelToController = future.channel();
-                LOG.debug("Send {} to {}.", subControllerCSR.toString().replace("\n", ""), policy.controller());
+                LOG.debug("Send to {}: {}.", policy.controller(), subControllerCSR.toString().replace("\n", ""));
                 channelToController.writeAndFlush(subControllerCSR).addListener(FIRE_EXCEPTION_ON_FAILURE);
             }
             else {
@@ -102,8 +109,8 @@ public class SubControllerPolicyHandler extends ChannelInboundHandlerAdapter {
             }
         });
 
+        // read myFunctionFileName & create a NetworkConfig & other variables with it
         try {
-            // read myFunctionFileName & create a NetworkConfig & other variables with it
             final File configFile = new File(policy.myFunctionFileName());
             final NetworkConfig config = NetworkConfig.parseFile(configFile);
             deviceHandler.network = config.network();
@@ -114,7 +121,19 @@ public class SubControllerPolicyHandler extends ChannelInboundHandlerAdapter {
             }
             LOG.debug("Read SubControllerNetworkConfig out of file.");
 
-            // do matchmaking
+            // currently this is quite strict with how the MAX_DEVICE_NUMBER & MIN_DEVICE_NUMBER have to be specified in the config file
+            BufferedReader bufferedReader = new BufferedReader(new FileReader(configFile));
+            String firstLine = bufferedReader.readLine();
+            String secondLine = bufferedReader.readLine();
+            if (firstLine.startsWith("MAX_DEVICE_NUMBER =") && secondLine.startsWith("MIN_DEVICE_NUMBER =")) {
+                maxDevices = Integer.parseInt(firstLine.substring(firstLine.indexOf("=") + 2));
+                minDevices = Integer.parseInt(secondLine.substring(secondLine.indexOf("=") + 2));
+                LOG.debug("read from the configFile: maxDevices = {}, minDevices = {}", maxDevices, minDevices);
+                deviceHandler.facts.put("max_devices", maxDevices);
+                deviceHandler.facts.put("min_devices", minDevices);
+            }
+
+            // do matchmaking FIXME: should this be done here? why not in the deviceHandler?
             final Set<Device> assignedDevices = new HashSet<>();
             final Map<LuaString, NetworkNode> nodes = deviceHandler.network.getNodes();
             for (final Map.Entry<LuaString, NetworkNode> entry : nodes.entrySet()) {
@@ -156,7 +175,6 @@ public class SubControllerPolicyHandler extends ChannelInboundHandlerAdapter {
                     policies = Set.of();
                 }
                 deviceHandler.policiesForMyDevices.addAll(policies);
-                //LOG.debug("Created Policies & Certificates for " + device.address().toString());
             }
         }
         catch (IOException e) {
@@ -168,13 +186,19 @@ public class SubControllerPolicyHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void handlerRemoved(final ChannelHandlerContext ctx) {
+        System.out.println("------------------------------------------------------------------------------------------------");
+        System.out.println("I am NO LONGER sub-controller!");
+        System.out.println("------------------------------------------------------------------------------------------------");
+
         // send reset message to all my devices
-        final ControllerHello resetMsg = new ControllerHello(Set.of(), List.of());
+        final SdonDeviceHandler deviceHandler = ctx.pipeline().get(SdonDeviceHandler.class);
+        deviceHandler.isSubController = false;
+        final ControllerHello resetMsg = new ControllerHello(Set.of(), deviceHandler.myCertificateStrings);
         for (DrasylAddress devAddress : policy.devices()) {
             ((DrasylServerChannel) ctx.channel()).serve(devAddress).addListener((ChannelFutureListener) future -> {
                 if (future.isSuccess()) {
                     final Channel channelToController = future.channel();
-                    LOG.debug("Send {} to {}.", resetMsg.toString().replace("\n", ""), devAddress);
+                    LOG.debug("Send to {}: {}.", devAddress, resetMsg.toString().replace("\n", ""));
                     channelToController.writeAndFlush(resetMsg).addListener(FIRE_EXCEPTION_ON_FAILURE);
                 }
                 else {

@@ -27,7 +27,6 @@ import org.drasyl.identity.IdentityPublicKey;
 import org.drasyl.util.network.Subnet;
 import org.luaj.vm2.LuaFunction;
 import org.luaj.vm2.LuaInteger;
-import org.luaj.vm2.LuaNil;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 import org.luaj.vm2.lib.OneArgFunction;
@@ -51,7 +50,8 @@ public class Device extends LuaTable {
         set("facts", tableOf());
         set("policies", tableOf());
         set("is_sub_controller", FALSE);
-        set("my_devices", tableOf());
+        set("intended_devices", tableOf());
+        set("actual_devices", tableOf());
         set("controller_address", LuaValue.valueOf(controllerAddress.toString()));
         set("make_sub_controller", new MakeSubControllerFunction());
         set("decommission_sub_controller", new DecommissionSubControllerFunction());
@@ -67,7 +67,8 @@ public class Device extends LuaTable {
         set("facts", tableOf());
         set("policies", tableOf());
         set("is_sub_controller", FALSE);
-        set("my_devices", tableOf());
+        set("intended_devices", tableOf());
+        set("actual_devices", tableOf());
         set("controller_address", LuaValue.valueOf(""));
         set("make_sub_controller", new MakeSubControllerFunction());
         set("decommission_sub_controller", new DecommissionSubControllerFunction());
@@ -85,7 +86,8 @@ public class Device extends LuaTable {
         stringTable.set("facts", get("facts"));
         stringTable.set("policies", get("policies"));
         stringTable.set("is_sub_controller", get("is_sub_controller"));
-        stringTable.set("my_devices", get("my_devices"));
+        stringTable.set("intended_devices", get("intended_devices"));
+        stringTable.set("actual_devices", get("actual_devices"));
         stringTable.set("controllerAddress", get("controllerAddress"));
         return "Device" + LuaHelper.toString(stringTable);
     }
@@ -120,8 +122,12 @@ public class Device extends LuaTable {
         }
     }
 
-    public Devices myDevices() {
-        return new Devices(get("my_devices").checktable());
+    public Devices intendedDevices() {
+        return new Devices(get("intended_devices").checktable());
+    }
+
+    public Devices actualDevices() {
+        return new Devices(get("actual_devices").checktable());
     }
 
     public void setFacts(final Map<String, Object> facts) {
@@ -144,23 +150,33 @@ public class Device extends LuaTable {
         int index = 1;
         for (final Policy policy : policies) {
             table.set(index++, policy.luaValue());
+
+            // update the devices in the device object based on feedback from the sub-controller
+            if (policy instanceof SubControllerPolicy) {
+                final LuaTable devAddresses = tableOf();
+                final Set<DrasylAddress> addresses = ((SubControllerPolicy) policy).devices();
+                int i = devAddresses.length() + 1;
+                for (DrasylAddress address : addresses) {
+                    devAddresses.set(i++, LuaValue.valueOf(address.toString()));
+                }
+                set("actual_devices", devAddresses);
+            }
         }
         set("policies", table);
     }
 
     public Set<Policy> createPolicies(Subnet subnet, String fallbackControllerAddress) {
         final Set<Policy> policies = new HashSet<>();
-        if (isSubController()) { // the SDON controller always sends SubControllerPolicies to a sub-controller with no difference whether the controller is already instantiated (the device (sub-controller) checks that)
-            final Devices myDevices = new Devices(get("my_devices").checktable());
-            final Collection<Device> myDeviceCollection = myDevices.getDevices();
-            final Set<DrasylAddress> myDeviceAddresses = new HashSet<>();
-            for (Device device : myDeviceCollection) {
-                myDeviceAddresses.add(device.address());
+
+        if (isSubController()) { // the SDON controller always sends SubControllerPolicies to a sub-controller with no difference whether the controller is already instantiated (the device/sub-controller checks that)
+            final Devices myDevices = new Devices(get("intended_devices").checktable());
+            final Set<DrasylAddress> myDeviceAddresses = myDevices.getDeviceAddresses();
+            if (isOnline()) { // this check is probably not necessary, but it won't hurt either, right?
+                final Policy controllerPolicy = new SubControllerPolicy(address(), controllerAddress(fallbackControllerAddress), myDeviceAddresses, true, subnet.toString(), "sub-controller-conf.lua");
+                policies.add(controllerPolicy);
             }
-            //final boolean testIsSubController = isSubController();
-            final Policy controllerPolicy = new SubControllerPolicy(address(), controllerAddress(fallbackControllerAddress), myDeviceAddresses, true, subnet.toString(), "sub-controller-conf.lua");
-            policies.add(controllerPolicy);
         }
+
         return policies;
     }
 
@@ -180,34 +196,39 @@ public class Device extends LuaTable {
         return (get("is_sub_controller") == TRUE);
     }
 
-    public void setNewDevices(Devices devices) {
-        final LuaTable devAddresses = new LuaTable();
+    public void addIntendedDevices(Devices devices) {
+        final LuaTable devAddresses = get("intended_devices").checktable();
+        //final LuaTable devAddresses = new LuaTable();
         final Collection<Device> devs = devices.getDevices();
-        int index = 0;
+        int index = devAddresses.length() + 1;
         for (Device dev : devs) {
             devAddresses.insert(index++, LuaValue.valueOf(dev.address().toString()));
         }
-        set("my_devices", devAddresses);
+        set("intended_devices", devAddresses);
     }
 
-    public void addDevices(Devices devices) {
-        final LuaTable devAddresses = get("my_devices").checktable();
+    public void addActualDevices(Devices devices) {
+        final LuaTable devAddresses = get("actual_devices").checktable();
+        //final LuaTable devAddresses = new LuaTable();
         final Collection<Device> devs = devices.getDevices();
-        int index = devAddresses.length();
+        int index = devAddresses.length() + 1;
         for (Device dev : devs) {
             devAddresses.insert(index++, LuaValue.valueOf(dev.address().toString()));
         }
-        set("my_devices", devAddresses);
+        set("actual_devices", devAddresses);
     }
 
-    public void removeAllDevices() {
-        set("my_devices", new LuaTable());
+    public void removeAllIntendedDevices() {
+        set("intended_devices", new LuaTable());
     }
 
-    LuaNil setFunction(final LuaFunction function) {
+    public void removeAllActualDevices() {
+        set("actual_devices", new LuaTable());
+    }
+
+    void setFunction(final LuaFunction function) {
         this.myFunction = function;
-
-        return (LuaNil) NIL;
+        //return (LuaNil) NIL;
     }
 
     static class MakeSubControllerFunction extends TwoArgFunction {
@@ -220,11 +241,8 @@ public class Device extends LuaTable {
                 final Devices newDevices = (Devices) devTable;
                 if (!subController.isSubController()) {
                     subController.setSubController();
-                    subController.setNewDevices(newDevices);
                 }
-                else {
-                    subController.addDevices(newDevices);
-                }
+                subController.addIntendedDevices(newDevices);
             }
             catch (ClassCastException e) {
                 System.out.println("The given LuaTables are not of Device & Devices type, instead " + subControllerTable.getClass() + " & " + devTable.getClass());
@@ -239,26 +257,32 @@ public class Device extends LuaTable {
             final LuaTable subControllerTable = subControllerArg.checktable();
             try {
                 final Device subController = (Device) subControllerTable;
-                subController.setNotSubController();
-                final Devices returnedDevices = subController.myDevices();
-                subController.removeAllDevices();
-                return returnedDevices;
+                if (subController.isOnline()) {
+                    subController.setNotSubController();
+                    final int nrReturnedDevices = subController.intendedDevices().countDevices();
+                    subController.removeAllIntendedDevices();
+                    return LuaValue.valueOf(nrReturnedDevices);
+                }
+                else {
+                    final int nrReturnedDevices = subController.intendedDevices().countDevices();
+                    return LuaValue.valueOf(nrReturnedDevices);
+                }
             }
             catch (ClassCastException e) {
                 System.out.println("The given LuaTable is not of Device type, instead " + subControllerTable.getClass());
             }
-            return NIL;
+            return LuaValue.valueOf(0);
         }
     }
 
     static class RemoveDevicesFromSubControllerFunction extends TwoArgFunction {
         @Override
-        public LuaValue call(final LuaValue subControllerArg, final LuaValue amount) {
+        public LuaValue call(final LuaValue subControllerArg, final LuaValue amountArg) {
             final LuaTable subControllerTable = subControllerArg.checktable();
-            final int amountDevices = amount.checkinteger().toint();
+            final int amountDevices = amountArg.checkinteger().toint();
             try {
                 final Device subController = (Device) subControllerTable;
-                final Devices subControllerDevices = subController.myDevices();
+                final Devices subControllerDevices = subController.intendedDevices();
                 final Set<Device> subControllerDeviceSet = (Set<Device>) subControllerDevices.getDevices();
                 final Devices returnedDevices = new Devices();
                 // removes (amountDevices often) the first device from the sub-controller's devices & adds it to the returnedDevices
@@ -268,7 +292,7 @@ public class Device extends LuaTable {
                     subControllerDeviceSet.remove(device);
                     subControllerDevices.removeDevice(device);
                 }
-                subController.setNewDevices(subControllerDevices);
+                subController.addIntendedDevices(subControllerDevices);
                 return returnedDevices;
             }
             catch (ClassCastException e) {
@@ -300,7 +324,7 @@ public class Device extends LuaTable {
                 if (theFacts.containsKey("max_devices")) {
                     final LuaInteger luaInt = (LuaInteger) subController.getFacts().get("max_devices");
                     final int maxDevices = luaInt.checkint();
-                    final int currentDevices = subController.myDevices().getDevices().size();
+                    final int currentDevices = subController.actualDevices().getDevices().size();
                     return LuaValue.valueOf(maxDevices - currentDevices);
                 }
                 else {
@@ -318,7 +342,7 @@ public class Device extends LuaTable {
         @Override
         public LuaValue call(final LuaValue deviceArg) {
             final Device device = (Device) deviceArg.checktable();
-            return LuaValue.valueOf(device.myDevices().countDevices());
+            return LuaValue.valueOf(device.actualDevices().countDevices());
         }
     }
 }

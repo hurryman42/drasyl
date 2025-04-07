@@ -33,6 +33,7 @@ import java.util.Set;
 
 public class Devices extends LuaTable {
     public Devices() {
+        // the Devices class should not have any functions in it because than then these functions are elements in every Devices object and the Lua script cannot iterate through Devices (that easily)
     }
 
     public Devices(LuaTable devices) {
@@ -81,9 +82,16 @@ public class Devices extends LuaTable {
         return devices;
     }
 
-    public int countDevices() {
+    public Set<DrasylAddress> getDeviceAddresses() {
+        final Set<DrasylAddress> deviceAddresses = new HashSet<>();
         final LuaValue[] keys = keys();
-        return keys.length;
+        for (final LuaValue key : keys) {
+            if (get(key) != NIL) {
+                Device device = (Device) get(key);
+                deviceAddresses.add(device.address());
+            }
+        }
+        return deviceAddresses;
     }
 
     public void addDevice(final Device device) {
@@ -92,5 +100,14 @@ public class Devices extends LuaTable {
 
     public void removeDevice(final Device device) {
         set(device.address().toString(), NIL);
+    }
+
+    public int countDevices() {
+        final LuaValue[] keys = keys();
+        return keys.length;
+    }
+
+    public boolean isEmpty() {
+        return countDevices() == 0;
     }
 }

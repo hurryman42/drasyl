@@ -43,7 +43,7 @@ public class NetworkConfig {
     }
 
     public static NetworkConfig parseFile(final File file) throws IOException {
-        LOG.debug("Load network config from `{}`", file);
+        LOG.debug("Loading network config from `{}`:", file);
         if (!file.exists()) {
             throw new FileNotFoundException(file.getAbsolutePath());
         }

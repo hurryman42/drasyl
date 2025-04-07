@@ -70,7 +70,7 @@ public class RunPolicy extends AbstractPolicy {
     @Override
     public String toString() {
         return "RunPolicy{" +
-                "command" + command +
+                "command=" + command +
                 "}";
     }
 }

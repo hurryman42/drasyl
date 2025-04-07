@@ -27,62 +27,107 @@ import org.drasyl.cli.sdon.config.RunPolicy;
 import org.drasyl.util.logging.Logger;
 import org.drasyl.util.logging.LoggerFactory;
 
+import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 
 import static java.util.Objects.requireNonNull;
 
 public class RunPolicyHandler extends ChannelInboundHandlerAdapter {
     private static final Logger LOG = LoggerFactory.getLogger(RunPolicyHandler.class);
     private final RunPolicy policy;
+    private Thread processThread;
 
     public RunPolicyHandler(final RunPolicy policy) {
         this.policy = requireNonNull(policy);
     }
 
     @Override
-    public void handlerAdded(final ChannelHandlerContext ctx) throws IOException {
-        try {
-            //ProcessBuilder processBuilder = new ProcessBuilder("sleep", "10");
-            //Process process = processBuilder.start();
+    public void handlerAdded(final ChannelHandlerContext ctx) throws IOException, InterruptedException {
+        //ProcessBuilder processBuilder = new ProcessBuilder("sleep", "10");
+        //Process process = processBuilder.start();
+        LOG.debug("About to execute: {}", String.join(" ", policy.command));
 
-            LOG.trace("Execute: {}", String.join(" ", policy.command));
-            final Process process = Runtime.getRuntime().exec(policy.command);
-            System.out.println(process.pid());
-            final Thread watcherThread = getWatcherThread(process);
-            watcherThread.start();
-            final int exitCode = process.waitFor();
-            watcherThread.join();
-        }
-        catch (final InterruptedException e) {
-            Thread.currentThread().interrupt(); // restore interrupted status
-        }
+        processThread = new Thread(() -> {
+            try {
+                // ProcessBuilder requires splitting the command into the different "words" & input them as a String-Array
+                final ProcessBuilder builder = new ProcessBuilder(policy.command.split(" "));
+                File outputFile = new File("logFile1.txt");
+                //builder.redirectOutput(outputFile);
+                final Process process = builder.start();
+
+                //final Process process = Runtime.getRuntime().exec(policy.command + " >> logFile1.txt");
+
+                //LOG.debug("Started process with ID {}", process.pid());
+                System.out.println("Started process with ID " + process.pid());
+
+                /*Thread outputThread = new Thread(() -> {
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                        String output;
+                        while ((output = reader.readLine()) != null) {
+                            //LOG.debug("{}", output);
+                            System.out.println(output);
+                        }
+                    }
+                    catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+                outputThread.start();*/
+
+                final BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                String output;
+                //while (output != null && !output.trim().equals("--EOF--")) {
+                // FIXME: loop never exits but also never prints (only when process gets killed)
+                //while (reader.ready()) {
+                //    LOG.debug("{}", reader.readLine());
+                //}
+                while ((output = reader.readLine()) != null) {
+                    //LOG.debug("{}", output);
+                    System.out.println(output);
+                    System.out.flush();
+                }
+                reader.close();
+
+                //final Thread watcherThread = getWatcherThread(process);
+                //watcherThread.start();
+
+                final int exitCode = process.waitFor();
+                //outputThread.join();
+                //watcherThread.join();
+            }
+            catch (final Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+        processThread.start();
 
         System.out.println("------------------------------------------------------------------------------------------------");
     }
 
     private static Thread getWatcherThread(Process process) {
         final Thread watcherThread = new Thread(() -> {
-            while (true) {
-                if (!process.isAlive()) {
-                    System.out.println("The process has finished!!!");
-                    break;
-                }
+            while (process.isAlive()) {
                 try {
                     System.out.println("Process still running...");
-                    Thread.sleep(1000); // busy-waiting with sleep
+                    Thread.sleep(1000); // FIXME: busy-waiting
                 }
                 catch (InterruptedException e) {
                     Thread.currentThread().interrupt(); // restore interrupted status
                     break;
                 }
             }
+            System.out.println("The process has finished!!!");
         });
+
         watcherThread.setName("watcher");
         return watcherThread;
     }
 
     @Override
     public void handlerRemoved(final ChannelHandlerContext ctx) {
-        System.out.println("-----");
+        System.out.println("Interrupting processThread.");
+        processThread.interrupt();
     }
 }

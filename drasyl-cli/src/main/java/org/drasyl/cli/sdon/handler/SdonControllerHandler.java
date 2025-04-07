@@ -89,7 +89,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
     private final PrivateKey privateKey;
     private final List<String> certificates;
     private final X509Certificate myCert;
-    private Subnet mySubnet;
+    private final Subnet mySubnet;
     private State state;
     private final Map<DrasylAddress, String> subControllerSubnets; // is this the best way to keep track of the controller's sub-controllers?
 
@@ -145,10 +145,26 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
 
             ctx.executor().scheduleAtFixedRate(() -> {
                 try {
-                    //LOG.debug("Starting Fixed Schedule!");
-                    // call callback
-                    network.callCallback(devices); // TODO: add permissions of the controller? (what subnet it controls, how many max devices, etc.)
-                    //LOG.debug("Finished calling Callback.");
+                    network.callCallback(devices); // the callback function removes the to be offloaded devices from the devices variable
+
+                    /* this was the idea to create nodes for all devices in the system at the primary controller and then propagate them through the sub-controllers
+                    however, this did not really work and so now each (sub-)controller creates nodes for its devices according to their Lua network configuration
+                    // (it cuts out all the sub-controllers & instead adds their devices, which are the actualDevices)
+                    Devices allActualDevices = new Devices();
+                    Devices allDevices = new Devices();
+                    for (Device device : devices.getDevices()) {
+                        allDevices.addDevice(device);
+                        if (device.isSubController()) {
+                            Devices subDevices = device.intendedDevices();
+                            for (Device dev : subDevices.getDevices()) {
+                                allActualDevices.addDevice(dev);
+                                allDevices.addDevice(dev);
+                            }
+                        }
+                        else {
+                            allActualDevices.addDevice(device);
+                        }
+                    }*/
 
                     // do matchmaking
                     final Set<Device> assignedDevices = new HashSet<>();
@@ -158,7 +174,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
 
                         Device bestMatch = null;
                         int minDistance = Integer.MAX_VALUE;
-                        for (final Device device : devices.getDevices()) {
+                        for (final Device device : devices.getDevices()) { // allActualDevices.getDevices()
                             if (!assignedDevices.contains(device)) {
                                 final int distance = node.getDistance(device);
                                 if (distance < minDistance) {
@@ -173,36 +189,43 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                             node.setDevice(bestMatch);
                         }
                     }
-                    //LOG.debug("Finished Matchmaking.");
+
 
                     // disseminate policies
-                    for (final Device device : devices.getDevices()) {
+                    for (final Device device : devices.getDevices()) { // allDevices.getDevices()
                         NetworkNode node = null;
                         for (final Entry<LuaString, NetworkNode> entry : nodes.entrySet()) {
                             if (Objects.equals(entry.getValue().device(), device.address())) {
                                 node = entry.getValue();
                             }
                         }
+
+                        // create smallerSubnet (is possibly used for SubControllerPolicy) & create devicePolicies
+                        final String smallerSubnetString = mySubnet.addressString() + "/" + (mySubnet.netmaskLength() + 8); // FIXME: +8 probably not always the best
+                        final Subnet smallerSubnet = new Subnet(smallerSubnetString);
+
                         final Set<Policy> policies;
-                        // FIXME: if there are not enough nodes for all the devices, the policies will not be created at all --> device goes back to primary controller, gets maybe directly offloaded --> chaos!
+                        // important: if there are not enough nodes for all the devices, some devices will get no policies at all
                         if (node != null) {
+                            // device got a node --> it is an actualDevice, not a sub-controller
                             policies = node.createPolicies();
-
-                            // create smallerSubnet (is used for SubControllerPolicy) & create devicePolicies
-                            final String smallerSubnetString = mySubnet.addressString() + "/" + (mySubnet.netmaskLength() + 8); // FIXME: +8 probably not always the best
-                            final Subnet smallerSubnet = new Subnet(smallerSubnetString);
-
                             final Set<Policy> devicePolicies = device.createPolicies(smallerSubnet, ctx.channel().localAddress().toString());
-
                             if (!devicePolicies.isEmpty()) {
                                 subControllerSubnets.put(device.address(), smallerSubnetString);
                                 policies.addAll(devicePolicies);
                             }
                         }
                         else {
-                            policies = Set.of();
+                            // device got no node --> it is (probably) a sub-controller
+                            final Set<Policy> devicePolicies = device.createPolicies(smallerSubnet, ctx.channel().localAddress().toString());
+                            if (!devicePolicies.isEmpty()) {
+                                subControllerSubnets.put(device.address(), smallerSubnetString);
+                                policies = devicePolicies;
+                            }
+                            else {
+                                policies = Set.of();
+                            }
                         }
-                        //LOG.debug("Created Policies and Certificates for " + device.address().toString());
 
                         final ControllerHello controllerHello = new ControllerHello(policies, certificates);
                         LOG.debug("Send to {}: {}", device.address(), controllerHello.toString().replace("\n", ""));
@@ -214,7 +237,6 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                             LOG.warn("No channel to device {} found.", device.address());
                         }
                     }
-                    //LOG.debug("Finished with Routine for every Device.");
                 }
                 catch (final Exception e) {
                     ctx.fireExceptionCaught(e);
@@ -224,22 +246,27 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
     }
 
     @Override
-    public void userEventTriggered(final ChannelHandlerContext ctx,
-                                   final Object evt) throws IOException, CertificateException, OperatorCreationException {
+    public void userEventTriggered(final ChannelHandlerContext ctx, final Object evt) throws IOException, CertificateException, OperatorCreationException {
         if (evt instanceof SdonMessageReceived) {
             final DrasylAddress sender = ((SdonMessageReceived) evt).address();
             final SdonMessage msg = ((SdonMessageReceived) evt).msg();
-            //LOG.trace("Received from `{}`: {}`", sender, msg);
+            //LOG.trace("Received from {}: {}", sender, msg);
             LOG.debug("Received from {}: {}`", sender, msg.toString().replace("\n", ""));
 
             if (msg instanceof DeviceHello) {
                 final DeviceHello deviceHello = (DeviceHello) msg;
                 final Device device = devices.getOrCreateDevice(sender);
 
-                if (deviceHello.csr().isEmpty()) {
-                    // add device, set policies & facts
+                if (deviceHello.csr().isEmpty()) { // add device, set policies & facts
                     device.setFacts(deviceHello.facts());
                     device.setPolicies(deviceHello.policies());
+
+                    // a sub-controller that wants to be a normal device again sends a DeviceHello with no feedbackPolicies
+                    if (device.isSubController() && deviceHello.policies().isEmpty()) {
+                        device.setNotSubController();
+                        device.removeAllActualDevices();
+                        device.removeAllIntendedDevices();
+                    }
 
                     final DrasylChannel channel = ((DrasylServerChannel) ctx.channel()).getChannels().get(sender);
                     if (device.isOffline()) {
@@ -252,8 +279,8 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                         device.setOnline();
                         out.println("Device " + sender + " registered.");
 
-                        final ControllerHello controllerHello = new ControllerHello();
-                        LOG.debug("Send {} to {}.", controllerHello.toString().replace("\n", ""), sender);
+                        final ControllerHello controllerHello = new ControllerHello(Set.of(), certificates);
+                        LOG.debug("Send to {}: {}.", sender, controllerHello.toString().replace("\n", ""));
                         channel.writeAndFlush(controllerHello).addListener(FIRE_EXCEPTION_ON_FAILURE);
                     }
                 }
@@ -310,17 +337,17 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                     final ControllerHello response = new ControllerHello(devicePolicies, certificatesWithNew);
 
                     final DrasylChannel subControllerChannel = ((DrasylServerChannel) ctx.channel()).getChannels().get(sender);
-                    LOG.debug("Send {} to {}.", response.toString().replace("\n", ""), sender);
+                    LOG.debug("Send to {}: {}.", sender, response.toString().replace("\n", ""));
                     subControllerChannel.writeAndFlush(response).addListener(FIRE_EXCEPTION_ON_FAILURE);
 
                     // send goodbye message to all the offloaded devices
                     final ControllerHello goodbyeMsg = new ControllerHello(Set.of(new ControlledPolicy(sender)), certificates);
-                    final Collection<Device> devs = device.myDevices().getDevices();
+                    final Collection<Device> devs = device.intendedDevices().getDevices();
                     for (Device dev : devs) {
-                        devices.removeDevice(dev);
                         final DrasylChannel goodbyeChannel = ((DrasylServerChannel) ctx.channel()).getChannels().get(dev.address());
-                        LOG.debug("Send {} to {}.", goodbyeMsg.toString().replace("\n", ""), dev.address());
+                        LOG.debug("Send to {}: {}.", dev.address(), goodbyeMsg.toString().replace("\n", ""));
                         goodbyeChannel.writeAndFlush(goodbyeMsg).addListener(FIRE_EXCEPTION_ON_FAILURE);
+                        devices.removeDevice(dev);
                     }
                 }
             }

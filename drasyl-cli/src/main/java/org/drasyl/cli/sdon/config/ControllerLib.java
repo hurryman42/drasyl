@@ -26,10 +26,14 @@ import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 import org.luaj.vm2.lib.OneArgFunction;
+import org.luaj.vm2.lib.ThreeArgFunction;
 import org.luaj.vm2.lib.TwoArgFunction;
 import org.luaj.vm2.lib.VarArgFunction;
 
-import java.util.Collection;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Set;
+
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -53,6 +57,9 @@ public class ControllerLib extends TwoArgFunction {
         env.set("elect_sub_controller", new ElectSubControllerFunction());
         env.set("select_devices_to_handover", new SelectDevicesToHandoverFunction());
         env.set("create_devices", new CreateDevicesFunction());
+        env.set("add_device_to_devices", new AddDeviceToDevicesFunction());
+        env.set("remove_device_from_devices", new RemoveDeviceFromDevicesFunction());
+        env.set("count_devices", new CountDevicesFunction());
         env.set("set_high_watermark", new SetHighWatermarkFunction());
         return library;
     }
@@ -106,36 +113,54 @@ public class ControllerLib extends TwoArgFunction {
         public LuaValue call(final LuaValue devicesArg) {
             final LuaTable devicesTable = devicesArg.checktable();
             final Devices devices = (Devices) devicesTable;
-            final Collection<Device> deviceList = devices.getDevices();
-            final Device subController = deviceList.iterator().next(); // at first calculate no score, but take the first best
+            final Set<Device> deviceSet = (Set<Device>) devices.getDevices();
+            final ArrayList<Device> deviceList = new ArrayList<>(deviceSet);
+
+            deviceList.sort(Comparator.comparing(dev -> dev.address().toString())); // sorts devices alphabetically
             /*int bestScore = 0;
-            for (Device device : deviceList) {
-                int currentDeviceScore = device.calculateConnectionScore(); // TODO: write function that calculates good score for the selection of sub-controller
+            for (Device device : deviceSet) {
+                // TODO: write function that calculates good score for the selection of sub-controller
+                int currentDeviceScore = device.calculateConnectionScore();
                 if (currentDeviceScore >= bestScore) {
                     bestScore = currentDeviceScore;
                     subController = device;
                 }
             }*/
-            return LuaValue.valueOf(subController.toString());
+            return deviceList.iterator().next();
         }
     }
 
-    static class SelectDevicesToHandoverFunction extends TwoArgFunction {
+    static class SelectDevicesToHandoverFunction extends ThreeArgFunction {
         @Override
-        public LuaValue call(final LuaValue devicesArg, final LuaValue amountArg) {
-            // just take the first best devices
+        public LuaValue call(final LuaValue devicesArg, final LuaValue subControllerArg, final LuaValue amountArg) {
             final LuaTable devicesTable = devicesArg.checktable();
             final Devices devices = (Devices) devicesTable;
-            final Collection<Device> deviceList = devices.getDevices();
+
+            final LuaTable subControllerTable = subControllerArg.checktable();
+            final Device subController = (Device) subControllerTable;
+
+            devices.removeDevice(subController);
+            final Set<Device> deviceSet = (Set<Device>) devices.getDevices();
+            final ArrayList<Device> deviceList = new ArrayList<>(deviceSet);
+
+            // sort the deviceList alphabetically by addresses
+            deviceList.sort(Comparator.comparing(dev -> dev.address().toString())); // sorts devices alphabetically
+
             final int amount = amountArg.toint();
             final Devices devicesToHandover = new Devices();
-            for (Device device : deviceList) {
-                devicesToHandover.add(device);
+            for (int i = 0; i < amount; i++) {
+                final Device device = deviceList.get(i);
+                device.setControllerAddress(subController.address());
+                devicesToHandover.addDevice(device);
             }
+
             return devicesToHandover;
         }
     }
 
+    /**
+     * Converts a LuaTable with Device objects in its array list part into a Devices object and returns it
+     */
     static class CreateDevicesFunction extends VarArgFunction {
         @Override
         public Devices call(final LuaValue devicesArg) {
@@ -152,6 +177,38 @@ public class ControllerLib extends TwoArgFunction {
                 }
             }
             return devices;
+        }
+    }
+
+    static class AddDeviceToDevicesFunction extends TwoArgFunction {
+        @Override
+        public LuaValue call(final LuaValue devicesArg, final LuaValue deviceArg) {
+            final Devices devices = (Devices) devicesArg.checktable();
+            final Device device = (Device) deviceArg.checktable();
+
+            devices.addDevice(device);
+
+            return NIL;
+        }
+    }
+
+    static class RemoveDeviceFromDevicesFunction extends TwoArgFunction {
+        @Override
+        public LuaValue call(final LuaValue devicesArg, final LuaValue deviceArg) {
+            final Devices devices = (Devices) devicesArg.checktable();
+            final Device device = (Device) deviceArg.checktable();
+
+            devices.removeDevice(device);
+
+            return NIL;
+        }
+    }
+
+    static class CountDevicesFunction extends OneArgFunction {
+        @Override
+        public LuaValue call(final LuaValue devicesArg) {
+            final Devices devices = (Devices) devicesArg.checktable();
+            return LuaValue.valueOf(devices.countDevices());
         }
     }
 

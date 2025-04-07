@@ -92,6 +92,10 @@ public class SubControllerPolicy extends AbstractPolicy {
         return myFunctionFileName;
     }
 
+    public void setDevices(Set<DrasylAddress> drasylAddresses) {
+        devices = drasylAddresses;
+    }
+
     @Override
     public void addPolicy(final ChannelPipeline pipeline) {
         pipeline.addLast(HANDLER_NAME, new SubControllerPolicyHandler(this));

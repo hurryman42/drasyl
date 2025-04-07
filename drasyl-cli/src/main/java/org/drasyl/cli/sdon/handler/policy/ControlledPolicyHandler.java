@@ -25,15 +25,15 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.drasyl.cli.sdon.config.ControlledPolicy;
 import org.drasyl.cli.sdon.handler.SdonDeviceHandler;
-import org.drasyl.identity.DrasylAddress;
 import org.drasyl.identity.IdentityPublicKey;
 import org.drasyl.util.logging.Logger;
 import org.drasyl.util.logging.LoggerFactory;
 
+import static java.lang.System.out;
 import static java.util.Objects.requireNonNull;
 
 public class ControlledPolicyHandler extends ChannelInboundHandlerAdapter {
-    private static final Logger LOG = LoggerFactory.getLogger(SubControllerPolicyHandler.class);
+    //private static final Logger LOG = LoggerFactory.getLogger(SubControllerPolicyHandler.class);
     private final ControlledPolicy policy;
 
     public ControlledPolicyHandler(final ControlledPolicy policy) {
@@ -43,13 +43,13 @@ public class ControlledPolicyHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void handlerAdded(final ChannelHandlerContext ctx) {
         final SdonDeviceHandler deviceHandler = ctx.pipeline().get(SdonDeviceHandler.class);
-        final DrasylAddress controllerAddress = policy.controller();
         deviceHandler.fallbackController = deviceHandler.controller;
-        deviceHandler.controller = IdentityPublicKey.of(controllerAddress.toString());
+        final IdentityPublicKey controllerPublicKey = (IdentityPublicKey) policy.controller(); //IdentityPublicKey.of(policy.controller().toString());
+        deviceHandler.controller = controllerPublicKey;
 
-        System.out.println("------------------------------------------------------------------------------------------------");
-        System.out.println("I am being CONTROLLED by: " + controllerAddress.toString());
-        System.out.println("------------------------------------------------------------------------------------------------");
+        out.println("------------------------------------------------------------------------------------------------");
+        out.println("My new CONTROLLER is: " + controllerPublicKey);
+        out.println("------------------------------------------------------------------------------------------------");
     }
 
     @Override

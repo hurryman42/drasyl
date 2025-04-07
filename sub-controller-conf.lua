@@ -1,9 +1,14 @@
-print("------------------------------------")
+MAX_DEVICE_NUMBER = 5
+MIN_DEVICE_NUMBER = 1
+
+--print("------------------------------------")
 print("The sub-controller script is called!")
 net = create_network()
-net:add_node("n1", {ip="10.0.1.42/24"})
+for i = 1, MAX_DEVICE_NUMBER do -- adapt this to maximum number of connected devices (last value for i is inclusive)
+    net:add_node("n" .. tostring(i), {ip="10.0.2." .. tostring(i) .. "/24"})
+    --net:add_node("n" .. tostring(i), {ip="10.0.2." .. tostring(i) .. "/24", run="python3 web-client.py"})
+end
 
-MAX_DEVICE_NUMBER = 2
 net:set_callback(
     function(my_net, devices)
         print("callback called")
@@ -19,4 +24,4 @@ net:set_callback(
 )
 
 register_network(net)
-print("------------------------------------")
+--print("------------------------------------")

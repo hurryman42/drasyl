@@ -128,10 +128,10 @@ public class NetworkNode extends LuaTable {
                     mapping.put(peerIpAddress, peerAddress);
                 }
             }
-
             final Policy tunPolicy = new TunPolicy(ipAddress, ipNetmask, mapping);
             policies.add(tunPolicy);
 
+            // RunPolicy
             final LuaValue runArgument = get("run");
             if (runArgument != NIL) {
                 final Policy runPolicy = new RunPolicy(runArgument.tojstring());

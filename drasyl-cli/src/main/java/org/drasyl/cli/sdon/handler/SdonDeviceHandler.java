@@ -27,11 +27,13 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
+import org.drasyl.channel.DrasylChannel;
 import org.drasyl.channel.DrasylServerChannel;
 import org.drasyl.cli.sdon.config.ControlledPolicy;
 import org.drasyl.cli.sdon.config.Device;
 import org.drasyl.cli.sdon.config.Devices;
 import org.drasyl.cli.sdon.config.Network;
+import org.drasyl.cli.sdon.config.RunPolicy;
 import org.drasyl.cli.sdon.config.SubControllerPolicy;
 import org.drasyl.cli.sdon.config.Policy;
 import org.drasyl.cli.sdon.config.TunPolicy;
@@ -56,9 +58,9 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
 import static io.netty.channel.ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE;
@@ -75,27 +77,38 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
     private final PrintStream out;
     public IdentityPublicKey fallbackController;
     public IdentityPublicKey controller;
+    public final Devices devices;
+    public Boolean isSubController;
+    public int nrIntendedDevices;
     public final PublicKey publicKey;
     public final PrivateKey privateKey;
     public X509Certificate myCert;
     public String myCertAsString;
     public List<String> myCertificateStrings;
+    public String[] subnetSplit;
     public final Map<String, Object> facts;
     State state;
-    public final Set<Policy> policiesForMe = new HashSet<>();
+    public Set<Policy> policiesForMe = new HashSet<>();
+    public Set<Policy> feedbackPolicies = new HashSet<>();
     public final Set<Policy> policiesForMyDevices = new HashSet<>();
     public Network network;
+    private int waitingCounter;
+    private int deregisteredDevices;
 
     public SdonDeviceHandler(final PrintStream out,
                              final IdentityPublicKey controller,
+                             final Devices devices,
                              final java.security.PublicKey publicKey,
                              final PrivateKey privateKey,
                              final Map<String, Object> facts) {
         this.out = requireNonNull(out);
         this.controller = requireNonNull(controller);
+        this.devices = requireNonNull(devices);
+        this.isSubController = false;
         this.publicKey = requireNonNull(publicKey);
         this.privateKey = requireNonNull(privateKey);
         this.facts = requireNonNull(facts);
+        this.deregisteredDevices = 0;
     }
 
     @Override
@@ -127,23 +140,72 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                         out.println("Connected!");
                         out.print("Register at controller...");
                         state = JOINING;
-                        final DeviceHello hello = new DeviceHello(facts, policiesForMe, "");
-                        LOG.debug("Send {} to {}", hello, controller);
+                        final DeviceHello hello = new DeviceHello(facts, feedbackPolicies, "");
+                        LOG.debug("Send to {}: {}", controller, hello);
                         channel.writeAndFlush(hello).addListener(FIRE_EXCEPTION_ON_FAILURE);
                     }
                 }
             });
 
-            ctx.executor().scheduleAtFixedRate(() -> ((DrasylServerChannel) ctx.channel()).serve(controller).addListener((ChannelFutureListener) future -> {
-                if (future.isSuccess()) {
-                    if (state == JOINED) {
-                        final Channel channel = future.channel();
-                        final DeviceHello hello = new DeviceHello(facts, policiesForMe, "");
-                        LOG.debug("Send {} to {}", hello, controller);
-                        channel.writeAndFlush(hello).addListener(FIRE_EXCEPTION_ON_FAILURE);
+            ctx.executor().scheduleAtFixedRate(() -> {
+                try {
+                    if (isSubController) {
+                        int minDevices = (int) facts.get("min_devices");
+                        if (nrIntendedDevices - deregisteredDevices >= minDevices) {
+                            // send ControllerHello messages to all the sub-controller's devices
+                            for (Device device : devices.getDevices()) {
+                                // here one could load individual policies for the different devices
+                                final ControllerHello message = new ControllerHello(policiesForMyDevices, myCertificateStrings);
+                                ((DrasylServerChannel) ctx.channel()).serve(device.address()).addListener((ChannelFutureListener) future -> {
+                                    if (future.isSuccess()) {
+                                        final Channel channelToController = future.channel();
+                                        LOG.debug("Send to {}: {}.", device.address(), message.toString().replace("\n", ""));
+                                        channelToController.writeAndFlush(message).addListener(FIRE_EXCEPTION_ON_FAILURE);
+                                    }
+                                    else {
+                                        throw (Exception) future.cause();
+                                    }
+                                });
+                            }
+                            // update the devices in the SubControllerPolicy that will be sent back to the controller
+                            for (Policy policy : feedbackPolicies) {
+                                if (policy instanceof SubControllerPolicy) {
+                                    ((SubControllerPolicy) policy).setDevices(devices.getDeviceAddresses());
+                                }
+                            }
+                        }
+                        else {
+                            System.out.println("got no devices anymore!");
+                            isSubController = false;
+                            feedbackPolicies.clear();
+                        }
                     }
+
+                    // if the device has not received a message in a long time, it tries connecting to its fallbackController
+                    if (waitingCounter >= 4) {
+                        System.out.println("changed to FALLBACK-CONTROLLER!");
+                        controller = fallbackController;
+                    }
+                    else {
+                        waitingCounter++;
+                    }
+
+                    // send DeviceHello to the device's controller (or fallbackController)
+                    ((DrasylServerChannel) ctx.channel()).serve(controller).addListener((ChannelFutureListener) future -> {
+                        if (future.isSuccess()) {
+                            if (state == JOINED) {
+                                final Channel channel = future.channel();
+                                final DeviceHello hello = new DeviceHello(facts, feedbackPolicies, "");
+                                LOG.debug("Send to {}: {}", controller, hello);
+                                channel.writeAndFlush(hello).addListener(FIRE_EXCEPTION_ON_FAILURE);
+                            }
+                        }
+                    });
                 }
-            }), randomInt(0, DEVICE_HELLO_INTERVAL), DEVICE_HELLO_INTERVAL, MILLISECONDS);
+                catch (final Exception e) {
+                    ctx.fireExceptionCaught(e);
+                }
+            }, randomInt(0, DEVICE_HELLO_INTERVAL), DEVICE_HELLO_INTERVAL, MILLISECONDS); // FIXME: maybe not the best intervals for ControllerHello's?
         }
     }
 
@@ -154,9 +216,34 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
             final DrasylAddress sender = ((SdonMessageReceived) evt).address();
             final SdonMessage msg = ((SdonMessageReceived) evt).msg();
             //out.println("----------------------------------------------------------------------------------------------");
-            LOG.debug("Received from `{}`: {}", sender, msg.toString().replace("\n", ""));
+            LOG.debug("Received from {}: {}", sender, msg.toString().replace("\n", ""));
+            waitingCounter = 0;
 
-            if (msg instanceof ControllerHello) { // && sender.equals(controller)
+            if (msg instanceof DeviceHello) { // --> device is sub-controller & gets message from its devices
+                final DeviceHello deviceHello = (DeviceHello) msg;
+                final Device device = devices.getOrCreateDevice(sender);
+
+                device.setFacts(deviceHello.facts());
+                device.setPolicies(deviceHello.policies());
+
+                final DrasylChannel channel = ((DrasylServerChannel) ctx.channel()).getChannels().get(sender);
+                if (device.isOffline()) {
+                    channel.closeFuture().addListener((ChannelFutureListener) future -> {
+                        device.setOffline();
+                        out.println("Device " + sender + " deregistered.");
+                        devices.removeDevice(device);
+                        deregisteredDevices++;
+                    });
+
+                    device.setOnline();
+                    out.println("Device " + sender + " registered.");
+
+                    final ControllerHello controllerHello = new ControllerHello(Set.of(), myCertificateStrings);
+                    LOG.debug("Send to {}: {}.", sender, controllerHello.toString().replace("\n", ""));
+                    channel.writeAndFlush(controllerHello).addListener(FIRE_EXCEPTION_ON_FAILURE);
+                }
+            }
+            else if (msg instanceof ControllerHello) { // --> device gets message from its controller
                 final ControllerHello controllerHello = (ControllerHello) msg;
                 final List<String> certificates = controllerHello.certificates();
 
@@ -188,7 +275,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                         certificate.verify(nextPubKey);
                     }
 
-                    // check subnet address in the "last" certificate
+                    // check subnet address in the "first" certificate
                     final String certString = certificates.get(0);
                     final X509Certificate cert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(certString.getBytes()));
                     final X500Name subject = new JcaX509CertificateHolder(cert).getSubject();
@@ -196,19 +283,22 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                     final String[] subjectInfos = subjectString.split(",");
                     final String subnet = subjectInfos[0].substring(3);
                     out.println("Valid X.509 certificate for subnet " + subnet);
-                    final String[] subnetSplit = subnet.split("/");
+                    //LOG.debug("Valid X.509 certificate for subnet {}", subnet);
+                    subnetSplit = subnet.split("/");
                     final InetAddress subnetAddress = InetAddress.getByName(subnetSplit[0]);
                     final byte[] subnetAddressBytes = subnetAddress.getAddress();
                     final short subnetNetmask = Short.parseShort(subnetSplit[1]);
 
                     // react to received policies
                     final Set<Policy> policies = controllerHello.policies();
-                    for (Policy policy : policies) {
+                    Iterator<Policy> policyIterator = policies.iterator();
+                    while (policyIterator.hasNext()){
+                        Policy policy = policyIterator.next();
                         if (policy instanceof TunPolicy) {
                             final TunPolicy tunPolicy = (TunPolicy) policy;
                             final InetAddress ipAddress = tunPolicy.address();
                             final byte[] ipAddressBytes = ipAddress.getAddress();
-                            final short netmask = tunPolicy.netmask();
+                            //final short netmask = tunPolicy.netmask();
 
                             final int numBytesToMask = subnetNetmask / 8;
                             final int remainingBits = subnetNetmask % 8;
@@ -232,7 +322,8 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                                 throw new Exception("IP address in policy does not fit in the subnet specified in the controller's certificate!");
                             }
                             else {
-                                out.println("Success: IP address in policy fits in the subnet specified in the controller's certificate!");
+                                out.println("IP address from policy fits in the subnet specified in the controller's certificate!");
+                                //LOG.debug("IP address from policy fits in the subnet specified in the controller's certificate!");
                             }
                             /*if (!(netmask == subnetNetmask)) {
                                 throw new Exception("The netmask of the IP address from the policy is not the same as netmask from the controller's certificate.");
@@ -247,7 +338,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
 
                             // the sub-controller receives its own certificate only once & then the chain without it (until the controller's certificate)
                             final String myNewCertificateString = certificates.get(0);
-                            out.println("Received certificate: " + myNewCertificateString.replace("\n", "")); // DEBUG
+                            //out.println("Received certificate: " + myNewCertificateString.replace("\n", "")); // DEBUG printing
                             if (myCertificateStrings == null) {
                                 myCertificateStrings = certificates;
                             }
@@ -260,32 +351,17 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                             }
                             out.println("----------------------------------------------------------------------------------------------");
 
-                            // create ControllerHello message with ControlledPolicy for each of the sub-controller's devices (same message for all of them)
+                            // add ControlledPolicy to the policiesForMyDevices
                             final DrasylAddress myAddress = subControllerPolicy.address();
-                            policiesForMyDevices.add(new ControlledPolicy(myAddress)); // maybe individual policy type created by that sub-controller & only send by it (metaprogramming; future work)
-                            final ControllerHello message = new ControllerHello(policiesForMyDevices, Objects.requireNonNullElse(myCertificateStrings, certificates));
-
-                            // for all the sub-controller's devices: add to myDevices & send ControllerHello
-                            final Set<DrasylAddress> myDeviceAddresses = subControllerPolicy.devices();
-                            final Devices myDevices = new Devices();
-                            for (DrasylAddress deviceAddress : myDeviceAddresses) {
-                                final Device thisDevice = new Device(deviceAddress, myAddress);
-                                myDevices.addDevice(thisDevice);
-
-                                ((DrasylServerChannel) ctx.channel()).serve(deviceAddress).addListener((ChannelFutureListener) future -> {
-                                    if (future.isSuccess()) {
-                                        final Channel channelToController = future.channel();
-                                        LOG.debug("Send {} to {}.", message.toString().replace("\n", ""), deviceAddress);
-                                        channelToController.writeAndFlush(message).addListener(FIRE_EXCEPTION_ON_FAILURE);
-                                    }
-                                    else {
-                                        throw (Exception) future.cause();
-                                    }
-                                });
-                            }
+                            policiesForMyDevices.add(new ControlledPolicy(myAddress));
 
                             // TODO: do we need a callback for the sub-controller-net?
-                            //network.callCallback(myDevices);
+                            //network.callCallback(intendedDevices);
+                        }
+                        else if (policy instanceof RunPolicy && isSubController) {
+                            final RunPolicy runPolicy = (RunPolicy) policy;
+                            policiesForMyDevices.add(runPolicy);
+                            policyIterator.remove();
                         }
                     }
                 }
@@ -300,12 +376,12 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                 state = JOINED;
 
                 final Set<Policy> newPolicies = controllerHello.policies();
-                LOG.debug("Got policies from controller: {}", newPolicies);
+                LOG.debug("--- Got policies from controller: {}", newPolicies);
 
                 // remove old policies
                 for (final Policy policy : policiesForMe) {
                     if (!newPolicies.contains(policy)) {
-                        LOG.debug("Remove old policy: {}", policy);
+                        LOG.debug("--- Remove old policy: {}", policy);
                         policy.removePolicy(ctx.pipeline());
                     }
                 }
@@ -313,13 +389,33 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                 // add new policies
                 for (final Policy newPolicy : newPolicies) {
                     if (!policiesForMe.contains(newPolicy)) {
-                        LOG.debug("Add new policy: {}", newPolicy);
+                        LOG.debug("--- Add new policy: {}", newPolicy);
                         newPolicy.addPolicy(ctx.pipeline());
                     }
                 }
 
+                //LOG.debug("PoliciesForMe1: " + policiesForMe);
                 policiesForMe.clear();
                 policiesForMe.addAll(newPolicies);
+                //LOG.debug("PoliciesForMe2: " + policiesForMe);
+
+                // add policies to feedbackPolicies & update devices in SubControllerPolicy (is properly empty)
+                feedbackPolicies.clear();
+                //feedbackPolicies = new HashSet<>(newPolicies);
+                for (Policy policy : policiesForMe) {
+                    if (policy instanceof SubControllerPolicy) {
+                        SubControllerPolicy scPolicy = (SubControllerPolicy) policy;
+                        SubControllerPolicy newPolicy = new SubControllerPolicy(scPolicy.address(), scPolicy.controller(), devices.getDeviceAddresses(), scPolicy.is_sub_controller(), scPolicy.subnetString(), scPolicy.myFunctionFileName());
+                        feedbackPolicies.add(newPolicy);
+                        //((SubControllerPolicy) policy).setDevices(devices.getDeviceAddresses());
+                    }
+                    else {
+                        feedbackPolicies.add(policy);
+                    }
+                }
+
+                //LOG.debug("FeedbackPolicies1: " + feedbackPolicies);
+                //LOG.debug("PoliciesForMe3: " + policiesForMe);
             }
         }
         else {
