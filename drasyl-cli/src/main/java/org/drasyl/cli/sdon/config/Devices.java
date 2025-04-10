@@ -87,7 +87,7 @@ public class Devices extends LuaTable {
         final LuaValue[] keys = keys();
         for (final LuaValue key : keys) {
             if (get(key) != NIL) {
-                Device device = (Device) get(key);
+                final Device device = (Device) get(key);
                 deviceAddresses.add(device.address());
             }
         }

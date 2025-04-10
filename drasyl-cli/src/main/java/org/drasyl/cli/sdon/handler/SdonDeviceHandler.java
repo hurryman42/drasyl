@@ -94,6 +94,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
     public Network network;
     private int waitingCounter;
     private int deregisteredDevices;
+    private int msgCount;
 
     public SdonDeviceHandler(final PrintStream out,
                              final IdentityPublicKey controller,
@@ -109,6 +110,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
         this.privateKey = requireNonNull(privateKey);
         this.facts = requireNonNull(facts);
         this.deregisteredDevices = 0;
+        this.msgCount = 0;
     }
 
     @Override
@@ -150,7 +152,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
             ctx.executor().scheduleAtFixedRate(() -> {
                 try {
                     if (isSubController) {
-                        int minDevices = (int) facts.get("min_devices");
+                        final int minDevices = (int) facts.get("min_devices");
                         if (nrIntendedDevices - deregisteredDevices >= minDevices) {
                             // send ControllerHello messages to all the sub-controller's devices
                             for (Device device : devices.getDevices()) {
@@ -198,6 +200,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                                 final DeviceHello hello = new DeviceHello(facts, feedbackPolicies, "");
                                 LOG.debug("Send to {}: {}", controller, hello);
                                 channel.writeAndFlush(hello).addListener(FIRE_EXCEPTION_ON_FAILURE);
+                                msgCount++;
                             }
                         }
                     });
@@ -217,6 +220,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
             final SdonMessage msg = ((SdonMessageReceived) evt).msg();
             //out.println("----------------------------------------------------------------------------------------------");
             LOG.debug("Received from {}: {}", sender, msg.toString().replace("\n", ""));
+            msgCount++;
             waitingCounter = 0;
 
             if (msg instanceof DeviceHello) { // --> device is sub-controller & gets message from its devices
@@ -241,6 +245,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                     final ControllerHello controllerHello = new ControllerHello(Set.of(), myCertificateStrings);
                     LOG.debug("Send to {}: {}.", sender, controllerHello.toString().replace("\n", ""));
                     channel.writeAndFlush(controllerHello).addListener(FIRE_EXCEPTION_ON_FAILURE);
+                    msgCount++;
                 }
             }
             else if (msg instanceof ControllerHello) { // --> device gets message from its controller
@@ -275,6 +280,9 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                         certificate.verify(nextPubKey);
                     }
 
+                    LOG.debug("{}", msgCount);
+                    msgCount = 0;
+
                     // check subnet address in the "first" certificate
                     final String certString = certificates.get(0);
                     final X509Certificate cert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(certString.getBytes()));
@@ -291,9 +299,9 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
 
                     // react to received policies
                     final Set<Policy> policies = controllerHello.policies();
-                    Iterator<Policy> policyIterator = policies.iterator();
-                    while (policyIterator.hasNext()){
-                        Policy policy = policyIterator.next();
+                    final Iterator<Policy> policyIterator = policies.iterator();
+                    while (policyIterator.hasNext()) {
+                        final Policy policy = policyIterator.next();
                         if (policy instanceof TunPolicy) {
                             final TunPolicy tunPolicy = (TunPolicy) policy;
                             final InetAddress ipAddress = tunPolicy.address();
@@ -404,8 +412,8 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                 //feedbackPolicies = new HashSet<>(newPolicies);
                 for (Policy policy : policiesForMe) {
                     if (policy instanceof SubControllerPolicy) {
-                        SubControllerPolicy scPolicy = (SubControllerPolicy) policy;
-                        SubControllerPolicy newPolicy = new SubControllerPolicy(scPolicy.address(), scPolicy.controller(), devices.getDeviceAddresses(), scPolicy.is_sub_controller(), scPolicy.subnetString(), scPolicy.myFunctionFileName());
+                        final SubControllerPolicy scPolicy = (SubControllerPolicy) policy;
+                        final SubControllerPolicy newPolicy = new SubControllerPolicy(scPolicy.address(), scPolicy.controller(), devices.getDeviceAddresses(), scPolicy.is_sub_controller(), scPolicy.subnetString(), scPolicy.myFunctionFileName());
                         feedbackPolicies.add(newPolicy);
                         //((SubControllerPolicy) policy).setDevices(devices.getDeviceAddresses());
                     }

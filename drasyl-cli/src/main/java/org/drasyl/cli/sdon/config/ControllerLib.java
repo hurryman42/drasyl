@@ -31,6 +31,7 @@ import org.luaj.vm2.lib.TwoArgFunction;
 import org.luaj.vm2.lib.VarArgFunction;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Set;
 
@@ -116,7 +117,12 @@ public class ControllerLib extends TwoArgFunction {
             final Set<Device> deviceSet = (Set<Device>) devices.getDevices();
             final ArrayList<Device> deviceList = new ArrayList<>(deviceSet);
 
-            deviceList.sort(Comparator.comparing(dev -> dev.address().toString())); // sorts devices alphabetically
+            // shuffle the deviceList
+            Collections.shuffle(deviceList);
+
+            // sort the deviceList alphabetically by addresses
+            //deviceList.sort(Comparator.comparing(dev -> dev.address().toString()));
+
             /*int bestScore = 0;
             for (Device device : deviceSet) {
                 // TODO: write function that calculates good score for the selection of sub-controller
@@ -143,8 +149,11 @@ public class ControllerLib extends TwoArgFunction {
             final Set<Device> deviceSet = (Set<Device>) devices.getDevices();
             final ArrayList<Device> deviceList = new ArrayList<>(deviceSet);
 
+            // shuffle the deviceList
+            Collections.shuffle(deviceList);
+
             // sort the deviceList alphabetically by addresses
-            deviceList.sort(Comparator.comparing(dev -> dev.address().toString())); // sorts devices alphabetically
+            //deviceList.sort(Comparator.comparing(dev -> dev.address().toString()));
 
             final int amount = amountArg.toint();
             final Devices devicesToHandover = new Devices();
@@ -215,8 +224,7 @@ public class ControllerLib extends TwoArgFunction {
     static class SetHighWatermarkFunction extends OneArgFunction {
         @Override
         public LuaValue call(final LuaValue deviceCount) {
-            int device_count = deviceCount.toint();
-            return LuaValue.valueOf((int) Math.ceil(Math.sqrt(device_count)));
+            return LuaValue.valueOf((int) Math.ceil(Math.sqrt(deviceCount.toint())));
         }
     }
 }

@@ -1,6 +1,6 @@
 math = require("math")
 
-fixed_HIGH_WATERMARK = 2 -- maximum number of actual devices the primary controller can manage (sub-controllers not counted); at HIGH_WATERMARK+1 --> offload devices onto a new sub-controller
+fixed_HIGH_WATERMARK = 5 -- maximum number of actual devices the primary controller can manage (sub-controllers not counted); at HIGH_WATERMARK+1 --> offload devices onto a new sub-controller
 fixed_LOW_WATERMARK = 0 -- minimum number of actual devices the primary controller should manage (sub-controllers not counted)
 HIGH_WATERMARK = 2 -- maximum number of devices the primary controller can manage; at HIGH_WATERMARK+1 --> offload devices onto a new sub-controller
 LOW_WATERMARK = 1 -- minimum number of devices the primary controller should have after offloading (still_scaling_up prevents chaos at the beginning); at LOW_WATERMARK-1 --> decommission a sub-controller
@@ -16,20 +16,20 @@ local controller_of_devices = {} -- mapping of device to its controller
 local still_scaling_up = true -- boolean to make sure the controller does not try to decommission a sub_controller when there was one created (probably a better way to do this for multiple sub_controllers)
 
 net = create_network()
-net:add_node("n1", {ip="10.0.1.1/24", run="python3 web-server.py"})
---net:add_node("n1", {ip="10.0.1.1/24"})
---for i = 2, 20 do -- adapt this to maximum number of connected devices (last value for i is inclusive)
---    net:add_node("n" .. tostring(i), {ip="10.0.1." .. tostring(i) .. "/24"})
---    --net:add_node("n" .. tostring(i), {ip="10.0.1." .. tostring(i) .. "/24", run="python3 web-client.py"})
---end
+--net:add_node("n1", {ip="10.0.1.1/24", run="python3 web-server.py"})
+net:add_node("n1", {ip="10.0.1.1/24"})
+for i = 2, 20 do -- adapt this to maximum number of connected devices (last value for i is inclusive)
+    net:add_node("n" .. tostring(i), {ip="10.0.1." .. tostring(i) .. "/24"})
+    --net:add_node("n" .. tostring(i), {ip="10.0.1." .. tostring(i) .. "/24", run="python3 web-client.py"})
+end
 
 
 net:set_callback(
     function(my_net, devices) -- set_callback is called every 5000ms
-        print("--------------------") -- DEBUG printing
-        for id, device in pairs(devices) do
-            print(inspect(device))
-        end
+        --print("--------------------") -- DEBUG printing
+        --for id, device in pairs(devices) do
+        --    print(inspect(device))
+        --end
         --print(count_devices(devices))
         actual_devices = create_devices({}) -- devices object with only the actual devices currently connected to the primary controller (without the sub-controllers)
         nr_sub_controllers = 0
@@ -117,9 +117,9 @@ net:set_callback(
 
 
         -- offload everything, don't count sub-controllers mode
-        --SUB_CONTROLLER_HIGH_WATERMARK = fixed_HIGH_WATERMARK
-        --HIGH_WATERMARK = fixed_HIGH_WATERMARK + nr_sub_controllers -- the originally specified HIGH_WATERMARK should not count the sub-controllers, so we have to add them here
-        --LOW_WATERMARK = fixed_LOW_WATERMARK + nr_sub_controllers -- the sub-controllers should not be offloaded
+        SUB_CONTROLLER_HIGH_WATERMARK = fixed_HIGH_WATERMARK
+        HIGH_WATERMARK = fixed_HIGH_WATERMARK + nr_sub_controllers -- the originally specified HIGH_WATERMARK should not count the sub-controllers, so we have to add them here
+        LOW_WATERMARK = fixed_LOW_WATERMARK + nr_sub_controllers -- the sub-controllers should not be offloaded
 
         -- set HIGH_WATERMARKs according to the number of devices totally connected
         --HIGH_WATERMARK = set_high_watermark(device_count)

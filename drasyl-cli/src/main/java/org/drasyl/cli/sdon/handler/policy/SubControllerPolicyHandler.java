@@ -122,9 +122,9 @@ public class SubControllerPolicyHandler extends ChannelInboundHandlerAdapter {
             LOG.debug("Read SubControllerNetworkConfig out of file.");
 
             // currently this is quite strict with how the MAX_DEVICE_NUMBER & MIN_DEVICE_NUMBER have to be specified in the config file
-            BufferedReader bufferedReader = new BufferedReader(new FileReader(configFile));
-            String firstLine = bufferedReader.readLine();
-            String secondLine = bufferedReader.readLine();
+            final BufferedReader bufferedReader = new BufferedReader(new FileReader(configFile));
+            final String firstLine = bufferedReader.readLine();
+            final String secondLine = bufferedReader.readLine();
             if (firstLine.startsWith("MAX_DEVICE_NUMBER =") && secondLine.startsWith("MIN_DEVICE_NUMBER =")) {
                 maxDevices = Integer.parseInt(firstLine.substring(firstLine.indexOf("=") + 2));
                 minDevices = Integer.parseInt(secondLine.substring(secondLine.indexOf("=") + 2));

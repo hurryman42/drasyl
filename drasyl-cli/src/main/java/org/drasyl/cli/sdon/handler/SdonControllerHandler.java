@@ -92,6 +92,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
     private final Subnet mySubnet;
     private State state;
     private final Map<DrasylAddress, String> subControllerSubnets; // is this the best way to keep track of the controller's sub-controllers?
+    private int msgCount;
 
     SdonControllerHandler(final PrintStream out,
                           final Network network,
@@ -110,6 +111,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
         this.myCert = requireNonNull(myCert);
         this.mySubnet = requireNonNull(mySubnet);
         this.subControllerSubnets = new HashMap<>();
+        this.msgCount = 0;
     }
 
     public SdonControllerHandler(final PrintStream out,
@@ -190,7 +192,6 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                         }
                     }
 
-
                     // disseminate policies
                     for (final Device device : devices.getDevices()) { // allDevices.getDevices()
                         NetworkNode node = null;
@@ -232,6 +233,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                         final DrasylChannel channel = ((DrasylServerChannel) ctx.channel()).getChannels().get(device.address());
                         if (channel != null) {
                             channel.writeAndFlush(controllerHello).addListener(FIRE_EXCEPTION_ON_FAILURE);
+                            msgCount++;
                         }
                         else {
                             LOG.warn("No channel to device {} found.", device.address());
@@ -252,6 +254,8 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
             final SdonMessage msg = ((SdonMessageReceived) evt).msg();
             //LOG.trace("Received from {}: {}", sender, msg);
             LOG.debug("Received from {}: {}`", sender, msg.toString().replace("\n", ""));
+            LOG.debug("{}", ++msgCount);
+            msgCount = 0;
 
             if (msg instanceof DeviceHello) {
                 final DeviceHello deviceHello = (DeviceHello) msg;

@@ -52,15 +52,20 @@ public class RunPolicyHandler extends ChannelInboundHandlerAdapter {
         processThread = new Thread(() -> {
             try {
                 // ProcessBuilder requires splitting the command into the different "words" & input them as a String-Array
+                //final File outputFile = new File("logFile1.txt");
                 final ProcessBuilder builder = new ProcessBuilder(policy.command.split(" "));
-                File outputFile = new File("logFile1.txt");
-                //builder.redirectOutput(outputFile);
-                final Process process = builder.start();
+                //builder.inheritIO();
+                //builder.redirectErrorStream(true); //--> gives also error stream with the normal output; does not broken output
+                //builder.redirectOutput(outputFile); //--> redirects output into a file, but also not live
+                //final Process process = builder.start();
+                //process.getInputStream().transferTo(System.out);
 
-                //final Process process = Runtime.getRuntime().exec(policy.command + " >> logFile1.txt");
+                final Process process = Runtime.getRuntime().exec(policy.command);
 
                 //LOG.debug("Started process with ID {}", process.pid());
                 System.out.println("Started process with ID " + process.pid());
+
+                System.out.flush();
 
                 /*Thread outputThread = new Thread(() -> {
                     try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
@@ -76,24 +81,28 @@ public class RunPolicyHandler extends ChannelInboundHandlerAdapter {
                 });
                 outputThread.start();*/
 
-                final BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
                 String output;
-                //while (output != null && !output.trim().equals("--EOF--")) {
-                // FIXME: loop never exits but also never prints (only when process gets killed)
+
+                // FIXME: loop never enters and therefore never prints (only when process gets killed)
+                final BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+                //final BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
                 //while (reader.ready()) {
                 //    LOG.debug("{}", reader.readLine());
                 //}
-                while ((output = reader.readLine()) != null) {
+                //System.out.println(reader.read());
+                while ((output = reader.readLine()) != null) { // == null bis zur Programmterminierung :(
                     //LOG.debug("{}", output);
                     System.out.println(output);
                     System.out.flush();
                 }
-                reader.close();
+
+                final int exitCode = process.waitFor();
+                System.out.println("process exit code: " + exitCode);
+                //reader.close();
 
                 //final Thread watcherThread = getWatcherThread(process);
                 //watcherThread.start();
 
-                final int exitCode = process.waitFor();
                 //outputThread.join();
                 //watcherThread.join();
             }

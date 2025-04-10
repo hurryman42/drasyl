@@ -26,8 +26,6 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.drasyl.cli.sdon.config.ControlledPolicy;
 import org.drasyl.cli.sdon.handler.SdonDeviceHandler;
 import org.drasyl.identity.IdentityPublicKey;
-import org.drasyl.util.logging.Logger;
-import org.drasyl.util.logging.LoggerFactory;
 
 import static java.lang.System.out;
 import static java.util.Objects.requireNonNull;
