@@ -145,11 +145,13 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                         final DeviceHello hello = new DeviceHello(facts, feedbackPolicies, "");
                         LOG.debug("Send to {}: {}", controller, hello);
                         channel.writeAndFlush(hello).addListener(FIRE_EXCEPTION_ON_FAILURE);
+                        msgCount++;
                     }
                 }
             });
 
             ctx.executor().scheduleAtFixedRate(() -> {
+                System.out.println("----------------------");
                 try {
                     if (isSubController) {
                         final int minDevices = (int) facts.get("min_devices");
@@ -163,6 +165,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                                         final Channel channelToController = future.channel();
                                         LOG.debug("Send to {}: {}.", device.address(), message.toString().replace("\n", ""));
                                         channelToController.writeAndFlush(message).addListener(FIRE_EXCEPTION_ON_FAILURE);
+                                        msgCount++;
                                     }
                                     else {
                                         throw (Exception) future.cause();
@@ -184,7 +187,7 @@ public class SdonDeviceHandler extends ChannelInboundHandlerAdapter {
                     }
 
                     // if the device has not received a message in a long time, it tries connecting to its fallbackController
-                    if (waitingCounter >= 4) {
+                    if (waitingCounter >= 4 && fallbackController != null) {
                         System.out.println("changed to FALLBACK-CONTROLLER!");
                         controller = fallbackController;
                     }

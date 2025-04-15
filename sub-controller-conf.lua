@@ -1,4 +1,4 @@
-MAX_DEVICE_NUMBER = 5
+MAX_DEVICE_NUMBER = 3
 MIN_DEVICE_NUMBER = 1
 
 --print("------------------------------------")

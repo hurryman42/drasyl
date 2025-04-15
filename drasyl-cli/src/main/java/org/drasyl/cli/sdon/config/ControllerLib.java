@@ -118,10 +118,10 @@ public class ControllerLib extends TwoArgFunction {
             final ArrayList<Device> deviceList = new ArrayList<>(deviceSet);
 
             // shuffle the deviceList
-            Collections.shuffle(deviceList);
+            //Collections.shuffle(deviceList);
 
             // sort the deviceList alphabetically by addresses
-            //deviceList.sort(Comparator.comparing(dev -> dev.address().toString()));
+            deviceList.sort(Comparator.comparing(dev -> dev.address().toString()));
 
             /*int bestScore = 0;
             for (Device device : deviceSet) {
@@ -150,10 +150,10 @@ public class ControllerLib extends TwoArgFunction {
             final ArrayList<Device> deviceList = new ArrayList<>(deviceSet);
 
             // shuffle the deviceList
-            Collections.shuffle(deviceList);
+            //Collections.shuffle(deviceList);
 
             // sort the deviceList alphabetically by addresses
-            //deviceList.sort(Comparator.comparing(dev -> dev.address().toString()));
+            deviceList.sort(Comparator.comparing(dev -> dev.address().toString()));
 
             final int amount = amountArg.toint();
             final Devices devicesToHandover = new Devices();

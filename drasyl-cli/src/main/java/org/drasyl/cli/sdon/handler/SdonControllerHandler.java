@@ -239,6 +239,8 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
                             LOG.warn("No channel to device {} found.", device.address());
                         }
                     }
+                    LOG.debug("{}", msgCount);
+                    msgCount = 0;
                 }
                 catch (final Exception e) {
                     ctx.fireExceptionCaught(e);
@@ -254,8 +256,7 @@ public class SdonControllerHandler extends ChannelInboundHandlerAdapter {
             final SdonMessage msg = ((SdonMessageReceived) evt).msg();
             //LOG.trace("Received from {}: {}", sender, msg);
             LOG.debug("Received from {}: {}`", sender, msg.toString().replace("\n", ""));
-            LOG.debug("{}", ++msgCount);
-            msgCount = 0;
+            msgCount++;
 
             if (msg instanceof DeviceHello) {
                 final DeviceHello deviceHello = (DeviceHello) msg;

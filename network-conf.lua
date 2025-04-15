@@ -1,6 +1,6 @@
 math = require("math")
 
-fixed_HIGH_WATERMARK = 5 -- maximum number of actual devices the primary controller can manage (sub-controllers not counted); at HIGH_WATERMARK+1 --> offload devices onto a new sub-controller
+fixed_HIGH_WATERMARK = 2 -- maximum number of actual devices the primary controller can manage (sub-controllers not counted); at HIGH_WATERMARK+1 --> offload devices onto a new sub-controller
 fixed_LOW_WATERMARK = 0 -- minimum number of actual devices the primary controller should manage (sub-controllers not counted)
 HIGH_WATERMARK = 2 -- maximum number of devices the primary controller can manage; at HIGH_WATERMARK+1 --> offload devices onto a new sub-controller
 LOW_WATERMARK = 1 -- minimum number of devices the primary controller should have after offloading (still_scaling_up prevents chaos at the beginning); at LOW_WATERMARK-1 --> decommission a sub-controller
@@ -110,6 +110,7 @@ net:set_callback(
                     end
                 end
             end
+            print(device_count)
         end
         print("--------------------") -- DEBUG printing
         --print("still_scaling_up = " .. tostring(still_scaling_up)) -- DEBUG printing
@@ -117,13 +118,13 @@ net:set_callback(
 
 
         -- offload everything, don't count sub-controllers mode
-        SUB_CONTROLLER_HIGH_WATERMARK = fixed_HIGH_WATERMARK
-        HIGH_WATERMARK = fixed_HIGH_WATERMARK + nr_sub_controllers -- the originally specified HIGH_WATERMARK should not count the sub-controllers, so we have to add them here
-        LOW_WATERMARK = fixed_LOW_WATERMARK + nr_sub_controllers -- the sub-controllers should not be offloaded
+        --SUB_CONTROLLER_HIGH_WATERMARK = fixed_HIGH_WATERMARK
+        --HIGH_WATERMARK = fixed_HIGH_WATERMARK + nr_sub_controllers -- the originally specified HIGH_WATERMARK should not count the sub-controllers, so we have to add them here
+        --LOW_WATERMARK = fixed_LOW_WATERMARK + nr_sub_controllers -- the sub-controllers should not be offloaded
 
         -- set HIGH_WATERMARKs according to the number of devices totally connected
         --HIGH_WATERMARK = set_high_watermark(device_count)
-        ---SUB_CONTROLLER_HIGH_WATERMARK = HIGH_WATERMARK - 1
+        --SUB_CONTROLLER_HIGH_WATERMARK = HIGH_WATERMARK - 1
 
         print("HIGH_WATERMARK=" .. HIGH_WATERMARK .. "  LOW_WATERMARK=" .. LOW_WATERMARK) -- DEBUG printing
 
