@@ -114,3 +114,13 @@ AutoValue_*
 /drasyl-shared-library/pypi/src/drasyl.egg-info
 /drasyl-shared-library/pypi/src/drasyl/libdrasyl
 /drasyl-shared-library/pypi/VERSION
+
+# X.509 certificates stuff
+*.crt
+*.csr
+*.key
+*.pem
+
+# web-server + -client testing
+web-client.py
+web-server.py
